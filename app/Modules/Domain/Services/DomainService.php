@@ -375,7 +375,10 @@ class DomainService
 
         // Set permissions
         $this->executor->executeAsRoot('chmod', ['-R', '755', $basePath]);
-        $this->executor->executeAsRoot('chmod', ['750', "{$basePath}/logs"]);
+
+        // Logs directory needs www-data group for Nginx workers to write access/error logs
+        $this->executor->executeAsRoot('chown', ["{$username}:www-data", "{$basePath}/logs"]);
+        $this->executor->executeAsRoot('chmod', ['770', "{$basePath}/logs"]);
 
         // Update domain paths
         $domain->update([

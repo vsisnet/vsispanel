@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth\Http\Controllers;
 
-use App\Models\User;
+use App\Modules\Auth\Models\User;
 use App\Modules\Auth\Http\Requests\CreateUserRequest;
 use App\Modules\Auth\Http\Requests\UpdateUserRequest;
 use App\Modules\Auth\Http\Resources\UserResource;

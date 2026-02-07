@@ -37,6 +37,18 @@ class ServerMetric extends Model
         ];
     }
 
+    /**
+     * Safely decode JSON, handling values that are already arrays.
+     */
+    public function fromJson($value, $asObject = false)
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        return parent::fromJson($value, $asObject);
+    }
+
     public function scopePeriod($query, string $period)
     {
         $from = match ($period) {

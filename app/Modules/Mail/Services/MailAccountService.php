@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Mail\Services;
 
-use App\Models\User;
+use App\Modules\Auth\Models\User;
 use App\Modules\Domain\Models\Domain;
 use App\Modules\Mail\Models\MailAccount;
 use App\Modules\Mail\Models\MailAlias;
