@@ -776,16 +776,16 @@ SVCEOF
     done
     log_ok "Panel services enabled and started"
 
-    # Install supervisor configs (backup for Horizon/Reverb)
-    log_info "Setting up Supervisor configs..."
-    if command -v supervisord &>/dev/null && [[ -d /etc/supervisor/conf.d ]]; then
-        cp -f "${PANEL_DIR}/deploy/supervisor/vsispanel-horizon.conf" /etc/supervisor/conf.d/ 2>/dev/null || true
-        cp -f "${PANEL_DIR}/deploy/supervisor/vsispanel-reverb.conf" /etc/supervisor/conf.d/ 2>/dev/null || true
-        supervisorctl reread >> "$LOG_FILE" 2>&1 || true
-        supervisorctl update >> "$LOG_FILE" 2>&1 || true
-        log_ok "Supervisor configs installed"
-    else
-        log_warn "Supervisor not found, skipping"
+    # Remove any conflicting supervisor configs (systemd handles these services)
+    if command -v supervisorctl &>/dev/null && [[ -d /etc/supervisor/conf.d ]]; then
+        if ls /etc/supervisor/conf.d/vsispanel-*.conf &>/dev/null 2>&1; then
+            log_info "Removing supervisor configs (systemd handles panel services)..."
+            supervisorctl stop vsispanel-horizon vsispanel-reverb 2>/dev/null || true
+            rm -f /etc/supervisor/conf.d/vsispanel-*.conf
+            supervisorctl reread >> "$LOG_FILE" 2>&1 || true
+            supervisorctl update >> "$LOG_FILE" 2>&1 || true
+            log_ok "Supervisor configs removed (using systemd instead)"
+        fi
     fi
 
     # Open firewall port if UFW is active
