@@ -183,19 +183,21 @@ class AppManagerService
             return $result->successful() && ! empty(trim($result->output()));
         }
 
-        // Standard package detection
+        // Standard package detection via dpkg
         if (! empty($config['packages'])) {
-            $result = Process::timeout(5)->run('dpkg -l ' . escapeshellarg($config['packages'][0]) . ' 2>/dev/null | grep -c "^ii"');
+            $pkg = escapeshellarg($config['packages'][0]);
+            $result = Process::timeout(5)->run("dpkg -s {$pkg} 2>/dev/null | grep -q '^Status: install ok installed'  && echo yes || echo no");
 
-            return trim($result->output()) === '1';
+            return trim($result->output()) === 'yes';
         }
 
-        // Panel services - check if systemd unit exists
+        // Panel services / systemd-based - check if unit file exists
         $serviceName = $config['service_name'] ?? null;
         if ($serviceName) {
-            $result = Process::timeout(5)->run('systemctl list-unit-files ' . escapeshellarg($serviceName . '.service') . ' 2>/dev/null | grep -c ' . escapeshellarg($serviceName));
+            $svc = escapeshellarg($serviceName . '.service');
+            $result = Process::timeout(5)->run("systemctl list-unit-files {$svc} 2>/dev/null | grep -q {$svc} && echo yes || echo no");
 
-            return (int) trim($result->output()) > 0;
+            return trim($result->output()) === 'yes';
         }
 
         return false;
