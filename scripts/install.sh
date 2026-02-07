@@ -387,7 +387,7 @@ EOSQL
 
     # Verify DB connection before running migrations
     log_info "Testing database connection..."
-    if ! php artisan db:show --counts 2>&1 | tee -a "$LOG_FILE" | head -5; then
+    if ! php artisan db:monitor 2>&1 | tee -a "$LOG_FILE"; then
         log_error "Cannot connect to database. Checking .env values..."
         grep "^DB_" .env | tee -a "$LOG_FILE"
         exit 1
