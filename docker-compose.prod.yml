@@ -1,0 +1,94 @@
+version: '3.8'
+
+# Production overrides for docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.prod
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+    restart: always
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  nginx:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+
+  mysql:
+    restart: always
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb_buffer_pool_size=256M
+      --innodb_log_file_size=64M
+      --max_connections=200
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  redis:
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+
+  horizon:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.prod
+    restart: always
+    profiles: []  # Enable by default in production
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.prod
+    restart: always
+    profiles: []  # Enable by default in production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M

@@ -1,0 +1,30 @@
+{
+    "label": "Default Zone",
+    "description": "Standard zone template with basic records (SOA, NS, A, www)",
+    "records": [
+        {
+            "name": "@",
+            "type": "NS",
+            "content": "ns1.{{domain}}.",
+            "ttl": 86400
+        },
+        {
+            "name": "@",
+            "type": "NS",
+            "content": "ns2.{{domain}}.",
+            "ttl": 86400
+        },
+        {
+            "name": "@",
+            "type": "A",
+            "content": "{{server_ip}}",
+            "ttl": 3600
+        },
+        {
+            "name": "www",
+            "type": "CNAME",
+            "content": "{{domain}}.",
+            "ttl": 3600
+        }
+    ]
+}

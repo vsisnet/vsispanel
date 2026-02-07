@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash",
+      "Bash(*)",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  }
+}

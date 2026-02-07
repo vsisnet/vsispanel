@@ -1,0 +1,31 @@
+{
+    "label": "Email Only",
+    "description": "MX, SPF, DKIM, and DMARC records for self-hosted email",
+    "records": [
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "mail.{{domain}}.",
+            "priority": 10,
+            "ttl": 3600
+        },
+        {
+            "name": "mail",
+            "type": "A",
+            "content": "{{server_ip}}",
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "TXT",
+            "content": "v=spf1 mx a ip4:{{server_ip}} ~all",
+            "ttl": 3600
+        },
+        {
+            "name": "_dmarc",
+            "type": "TXT",
+            "content": "v=DMARC1; p=none; rua=mailto:postmaster@{{domain}}",
+            "ttl": 3600
+        }
+    ]
+}

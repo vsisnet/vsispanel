@@ -1,0 +1,47 @@
+{
+    "label": "Google Workspace",
+    "description": "MX records and verification for Google Workspace email",
+    "records": [
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "aspmx.l.google.com.",
+            "priority": 1,
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "alt1.aspmx.l.google.com.",
+            "priority": 5,
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "alt2.aspmx.l.google.com.",
+            "priority": 5,
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "alt3.aspmx.l.google.com.",
+            "priority": 10,
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "alt4.aspmx.l.google.com.",
+            "priority": 10,
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "TXT",
+            "content": "v=spf1 include:_spf.google.com ~all",
+            "ttl": 3600
+        }
+    ]
+}

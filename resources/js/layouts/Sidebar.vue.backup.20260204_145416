@@ -1,0 +1,168 @@
+<template>
+  <aside
+    :class="[
+      'fixed inset-y-0 left-0 z-30 flex flex-col bg-gray-900 dark:bg-gray-950 transition-all duration-300 ease-in-out',
+      collapsed ? 'w-16' : 'w-64'
+    ]"
+  >
+    <!-- Logo -->
+    <div class="flex items-center h-14 px-4 border-b border-gray-800">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+          </svg>
+        </div>
+        <span v-if="!collapsed" class="text-lg font-bold text-white">VSISPanel</span>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 overflow-y-auto py-4">
+      <div v-for="group in navigationGroups" :key="group.name" class="mb-6">
+        <!-- Group Label -->
+        <div v-if="!collapsed" class="px-4 mb-2">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            {{ $t(group.label) }}
+          </span>
+        </div>
+
+        <!-- Group Items -->
+        <ul class="space-y-1 px-2">
+          <li v-for="item in group.items" :key="item.name">
+            <router-link
+              v-if="shouldShowItem(item)"
+              :to="{ name: item.route }"
+              :class="[
+                'flex items-center px-3 py-2 rounded-lg transition-colors group',
+                isActive(item.route)
+                  ? 'bg-primary-600 text-white'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              ]"
+              :title="collapsed ? $t(item.label) : ''"
+            >
+              <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+              <span v-if="!collapsed" class="ml-3 text-sm">{{ $t(item.label) }}</span>
+
+              <!-- Tooltip for collapsed mode -->
+              <div
+                v-if="collapsed"
+                class="absolute left-16 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50"
+              >
+                {{ $t(item.label) }}
+              </div>
+            </router-link>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Collapse Toggle -->
+    <div class="border-t border-gray-800 p-2">
+      <button
+        @click="toggleCollapse"
+        class="w-full flex items-center justify-center px-3 py-2 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors"
+      >
+        <ChevronLeftIcon v-if="!collapsed" class="w-5 h-5" />
+        <ChevronRightIcon v-else class="w-5 h-5" />
+      </button>
+    </div>
+  </aside>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import {
+  HomeIcon,
+  GlobeAltIcon,
+  CircleStackIcon,
+  FolderIcon,
+  EnvelopeIcon,
+  ServerStackIcon,
+  LockClosedIcon,
+  ShieldCheckIcon,
+  CloudArrowUpIcon,
+  ChartBarIcon,
+  ClockIcon,
+  CommandLineIcon,
+  UsersIcon,
+  CubeIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowUpTrayIcon
+} from '@heroicons/vue/24/outline'
+
+const route = useRoute()
+const appStore = useAppStore()
+const authStore = useAuthStore()
+
+const collapsed = computed(() => appStore.sidebarCollapsed)
+
+const navigationGroups = [
+  {
+    name: 'main',
+    label: 'navGroups.main',
+    items: [
+      { name: 'dashboard', route: 'dashboard', label: 'nav.dashboard', icon: HomeIcon }
+    ]
+  },
+  {
+    name: 'websites',
+    label: 'navGroups.websites',
+    items: [
+      { name: 'websites', route: 'websites', label: 'nav.websites', icon: GlobeAltIcon, permission: 'domains.view' },
+      { name: 'databases', route: 'databases', label: 'nav.databases', icon: CircleStackIcon, permission: 'databases.view' },
+      { name: 'files', route: 'files', label: 'nav.fileManager', icon: FolderIcon, permission: 'files.view' },
+      { name: 'ftp', route: 'ftp', label: 'nav.ftp', icon: ArrowUpTrayIcon, permission: 'ftp.view' }
+    ]
+  },
+  {
+    name: 'emailDns',
+    label: 'navGroups.emailDns',
+    items: [
+      { name: 'email', route: 'email', label: 'nav.email', icon: EnvelopeIcon, permission: 'mail.view' },
+      { name: 'dns', route: 'dns', label: 'nav.dns', icon: ServerStackIcon, permission: 'dns.view' }
+    ]
+  },
+  {
+    name: 'security',
+    label: 'navGroups.security',
+    items: [
+      { name: 'ssl', route: 'ssl', label: 'nav.ssl', icon: LockClosedIcon, permission: 'ssl.view' },
+      { name: 'firewall', route: 'firewall', label: 'nav.firewall', icon: ShieldCheckIcon, permission: 'firewall.view' },
+      { name: 'backup', route: 'backup', label: 'nav.backup', icon: CloudArrowUpIcon, permission: 'backup.view' }
+    ]
+  },
+  {
+    name: 'server',
+    label: 'navGroups.server',
+    items: [
+      { name: 'monitoring', route: 'monitoring', label: 'nav.monitoring', icon: ChartBarIcon, permission: 'monitoring.view' },
+      { name: 'cron', route: 'cron', label: 'nav.cronJobs', icon: ClockIcon, permission: 'cron.view' }
+    ]
+  },
+  {
+    name: 'admin',
+    label: 'navGroups.admin',
+    items: [
+      { name: 'users', route: 'users', label: 'nav.users', icon: UsersIcon, permission: 'users.view' }
+    ]
+  }
+]
+
+function isActive(routeName) {
+  return route.name === routeName
+}
+
+function shouldShowItem(item) {
+  if (!item.permission) return true
+  return authStore.hasPermission(item.permission)
+}
+
+function toggleCollapse() {
+  appStore.toggleSidebar()
+}
+</script>

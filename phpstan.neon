@@ -1,0 +1,35 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    # Analysis level (0-9, where 9 is the strictest)
+    # Start at level 4, increase gradually as code matures
+    level: 4
+
+    # Paths to analyse
+    paths:
+        - app
+
+    # Exclude paths
+    excludePaths:
+        - app/Modules/*/Database/Factories
+        - app/Modules/*/Database/Seeders
+
+    # Laravel-specific settings
+    treatPhpDocTypesAsCertain: false
+
+    # Ignore specific errors
+    ignoreErrors:
+        # Allow dynamic properties on models (for now)
+        - '#Access to an undefined property App\\Modules\\[A-Za-z]+\\Models\\[A-Za-z]+::\$[a-z_]+#'
+
+        # Ignore factory related errors
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Factories\\Factory#'
+
+    # Report unmatched ignored errors
+    reportUnmatchedIgnoredErrors: false
+
+    # Universal object crates (allows dynamic properties)
+    universalObjectCratesClasses:
+        - Illuminate\Http\Request
+        - Illuminate\Support\Collection

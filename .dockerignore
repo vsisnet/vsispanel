@@ -1,0 +1,68 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Dependencies (will be installed in container)
+node_modules
+vendor
+
+# Build artifacts
+public/build
+public/hot
+public/storage
+
+# Logs
+*.log
+storage/logs/*
+
+# Cache
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+
+# Testing
+.phpunit.result.cache
+coverage
+.pest
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.backup
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.md
+!README.md
+LICENSE
+Makefile
+phpunit.xml
+phpstan.neon
+pint.json
+
+# Development files
+tests
+*.test.js
+*.spec.js
+cypress

@@ -1,0 +1,43 @@
+{
+    "label": "Microsoft 365",
+    "description": "MX records and autodiscover for Microsoft 365 email",
+    "records": [
+        {
+            "name": "@",
+            "type": "MX",
+            "content": "{{domain}}.mail.protection.outlook.com.",
+            "priority": 0,
+            "ttl": 3600
+        },
+        {
+            "name": "autodiscover",
+            "type": "CNAME",
+            "content": "autodiscover.outlook.com.",
+            "ttl": 3600
+        },
+        {
+            "name": "@",
+            "type": "TXT",
+            "content": "v=spf1 include:spf.protection.outlook.com -all",
+            "ttl": 3600
+        },
+        {
+            "name": "_sipfederationtls._tcp",
+            "type": "SRV",
+            "content": "sipfed.online.lync.com.",
+            "priority": 100,
+            "weight": 1,
+            "port": 5061,
+            "ttl": 3600
+        },
+        {
+            "name": "_sip._tls",
+            "type": "SRV",
+            "content": "sipdir.online.lync.com.",
+            "priority": 100,
+            "weight": 1,
+            "port": 443,
+            "ttl": 3600
+        }
+    ]
+}
