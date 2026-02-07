@@ -239,6 +239,26 @@ install_services() {
         log_warn "Skipped DNS server installation (--skip-dns)"
     fi
 
+    # Fail2Ban
+    if ! command -v fail2ban-client &>/dev/null; then
+        log_info "Installing Fail2Ban..."
+        apt-get install -y -qq fail2ban >> "$LOG_FILE" 2>&1
+        systemctl enable fail2ban >> "$LOG_FILE" 2>&1
+        systemctl start fail2ban
+        log_ok "Fail2Ban installed"
+    else
+        log_ok "Fail2Ban already installed"
+    fi
+
+    # UFW Firewall
+    if ! command -v ufw &>/dev/null; then
+        log_info "Installing UFW..."
+        apt-get install -y -qq ufw >> "$LOG_FILE" 2>&1
+        log_ok "UFW installed"
+    else
+        log_ok "UFW already installed"
+    fi
+
     # Certbot for SSL
     if ! command -v certbot &>/dev/null; then
         log_info "Installing Certbot..."
@@ -488,7 +508,112 @@ configure_system() {
     systemctl restart php8.3-fpm
     log_ok "PHP-FPM started"
 
-    # Install supervisor configs
+    # Install VSISPanel systemd services
+    log_info "Installing panel systemd services..."
+
+    # vsispanel-web (Laravel dev server — registered for AppManager, Nginx handles production)
+    cat > /etc/systemd/system/vsispanel-web.service <<'SVCEOF'
+[Unit]
+Description=VSISPanel Web Server (Laravel)
+After=network.target mysql.service redis-server.service
+Wants=mysql.service redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vsispanel
+ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=8000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vsispanel-web
+Environment=APP_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    # vsispanel-horizon (Queue worker — required)
+    cat > /etc/systemd/system/vsispanel-horizon.service <<'SVCEOF'
+[Unit]
+Description=VSISPanel Queue Worker (Laravel Horizon)
+After=network.target mysql.service redis-server.service
+Wants=mysql.service redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vsispanel
+ExecStart=/usr/bin/php artisan horizon
+ExecStop=/usr/bin/php artisan horizon:terminate
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vsispanel-horizon
+Environment=APP_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    # vsispanel-reverb (WebSocket server)
+    cat > /etc/systemd/system/vsispanel-reverb.service <<'SVCEOF'
+[Unit]
+Description=VSISPanel WebSocket Server (Laravel Reverb)
+After=network.target mysql.service redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vsispanel
+ExecStart=/usr/bin/php artisan reverb:start
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vsispanel-reverb
+Environment=APP_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    # vsispanel-terminal (Terminal WebSocket)
+    cat > /etc/systemd/system/vsispanel-terminal.service <<'SVCEOF'
+[Unit]
+Description=VSISPanel Terminal WebSocket Server
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vsispanel
+ExecStart=/usr/bin/node /opt/vsispanel/terminal-server.cjs
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=TERMINAL_PORT=8022
+Environment=REDIS_URL=redis://127.0.0.1:6379
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    systemctl daemon-reload
+    log_ok "Panel systemd service files installed"
+
+    # Enable and start panel services
+    for svc in vsispanel-web vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
+        systemctl enable "${svc}.service" >> "$LOG_FILE" 2>&1 || true
+        systemctl start "${svc}.service" >> "$LOG_FILE" 2>&1 || true
+    done
+    log_ok "Panel services enabled and started"
+
+    # Install supervisor configs (backup for Horizon/Reverb)
     log_info "Setting up Supervisor configs..."
     if command -v supervisord &>/dev/null && [[ -d /etc/supervisor/conf.d ]]; then
         cp -f "${PANEL_DIR}/deploy/supervisor/vsispanel-horizon.conf" /etc/supervisor/conf.d/ 2>/dev/null || true
