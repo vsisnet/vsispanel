@@ -385,9 +385,9 @@ EOSQL
     rm -f bootstrap/cache/config.php
     log_ok "Config cache cleared"
 
-    # Verify DB connection before running migrations
+    # Verify DB connection before running migrations (use mysql CLI, not artisan)
     log_info "Testing database connection..."
-    if php artisan migrate:status >> "$LOG_FILE" 2>&1; then
+    if mysql -u"${db_user}" -p"${db_pass}" -e "SELECT 1" "${db_name}" >> "$LOG_FILE" 2>&1; then
         log_ok "Database connection verified"
     else
         log_error "Cannot connect to database. .env values:"
