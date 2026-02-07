@@ -380,6 +380,11 @@ EOSQL
     sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${db_pass}/" .env
     log_ok "Updated .env with database credentials"
 
+    # Clear any cached config (critical: old cache may have root user)
+    php artisan config:clear >> "$LOG_FILE" 2>&1 || true
+    rm -f bootstrap/cache/config.php
+    log_ok "Config cache cleared"
+
     # Run migrations
     log_info "Running migrations..."
     if ! php artisan migrate --force >> "$LOG_FILE" 2>&1; then
