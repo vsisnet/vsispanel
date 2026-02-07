@@ -259,6 +259,17 @@ install_services() {
         log_ok "UFW already installed"
     fi
 
+    # ProFTPD (FTP server)
+    if ! command -v proftpd &>/dev/null; then
+        log_info "Installing ProFTPD..."
+        apt-get install -y -qq proftpd-basic >> "$LOG_FILE" 2>&1
+        systemctl enable proftpd >> "$LOG_FILE" 2>&1
+        systemctl start proftpd
+        log_ok "ProFTPD installed"
+    else
+        log_ok "ProFTPD already installed"
+    fi
+
     # Certbot for SSL
     if ! command -v certbot &>/dev/null; then
         log_info "Installing Certbot..."
