@@ -450,6 +450,35 @@ configure_system() {
         log_warn "crontab not found, skipping scheduler setup"
     fi
 
+    # Generate self-signed SSL certificate for panel
+    log_info "Generating SSL certificate for panel..."
+    mkdir -p /etc/ssl/vsispanel
+    if [[ ! -f /etc/ssl/vsispanel/panel.crt ]]; then
+        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout /etc/ssl/vsispanel/panel.key \
+            -out /etc/ssl/vsispanel/panel.crt \
+            -subj "/C=VN/ST=HCM/L=HCM/O=VSISPanel/CN=$(hostname -I | awk '{print $1}')" \
+            >> "$LOG_FILE" 2>&1
+        chmod 600 /etc/ssl/vsispanel/panel.key
+        log_ok "Self-signed SSL certificate generated (10 years)"
+    else
+        log_ok "SSL certificate already exists"
+    fi
+
+    # Configure Nginx for panel
+    log_info "Configuring Nginx for panel (port 8443)..."
+    cp -f "${PANEL_DIR}/deploy/nginx/vsispanel.conf" /etc/nginx/sites-available/vsispanel.conf
+    ln -sf /etc/nginx/sites-available/vsispanel.conf /etc/nginx/sites-enabled/vsispanel.conf
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t >> "$LOG_FILE" 2>&1
+    systemctl reload nginx
+    log_ok "Nginx configured on port 8443 (SSL)"
+
+    # Ensure PHP-FPM is running
+    systemctl enable php8.3-fpm >> "$LOG_FILE" 2>&1 || true
+    systemctl restart php8.3-fpm
+    log_ok "PHP-FPM started"
+
     # Install supervisor configs
     log_info "Setting up Supervisor configs..."
     if command -v supervisord &>/dev/null && [[ -d /etc/supervisor/conf.d ]]; then
@@ -460,6 +489,12 @@ configure_system() {
         log_ok "Supervisor configs installed"
     else
         log_warn "Supervisor not found, skipping"
+    fi
+
+    # Open firewall port if UFW is active
+    if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+        ufw allow 8443/tcp >> "$LOG_FILE" 2>&1 || true
+        log_ok "Firewall port 8443 opened"
     fi
 
     # Optimize
@@ -488,17 +523,15 @@ print_complete() {
     echo ""
     echo -e "  Panel URL:      ${CYAN}https://${server_ip}:8443${NC}"
     echo -e "  Admin Email:    ${CYAN}admin@vsispanel.local${NC}"
-    echo -e "  Admin Password: ${CYAN}(set during database seeding)${NC}"
+    echo -e "  Admin Password: ${CYAN}Quanghuy@@3112${NC}"
     echo ""
-    echo -e "  ${BOLD}Next Steps:${NC}"
-    echo -e "  1. Edit ${YELLOW}/opt/vsispanel/.env${NC} with your settings"
-    echo -e "  2. Open the panel URL and complete the setup wizard"
-    echo -e "  3. Change the default admin password"
+    echo -e "  ${YELLOW}⚠  Please change the default password after first login!${NC}"
+    echo -e "  ${YELLOW}⚠  The SSL certificate is self-signed. Your browser will show a warning.${NC}"
     echo ""
     echo -e "  ${BOLD}Manage Services:${NC}"
-    echo -e "    systemctl status vsispanel-web"
-    echo -e "    systemctl status vsispanel-horizon"
-    echo -e "    systemctl status vsispanel-reverb"
+    echo -e "    systemctl status nginx"
+    echo -e "    systemctl status php8.3-fpm"
+    echo -e "    supervisorctl status"
     echo ""
     echo -e "  Log file: ${YELLOW}${LOG_FILE}${NC}"
     echo ""
