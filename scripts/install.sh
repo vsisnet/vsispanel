@@ -356,13 +356,38 @@ setup_database() {
 
     cd "$PANEL_DIR"
 
-    # Create database if it doesn't exist
-    local db_name
+    local db_name db_user db_pass
+
     db_name=$(grep "^DB_DATABASE=" .env | cut -d= -f2 | tr -d '"')
     db_name=${db_name:-vsispanel}
 
-    mysql -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || true
-    log_ok "Database '${db_name}' ready"
+    db_user=$(grep "^DB_USERNAME=" .env | cut -d= -f2 | tr -d '"')
+    db_user=${db_user:-vsispanel}
+
+    db_pass=$(grep "^DB_PASSWORD=" .env | cut -d= -f2 | tr -d '"')
+
+    # Generate password if empty
+    if [[ -z "$db_pass" ]]; then
+        db_pass=$(openssl rand -base64 24 | tr -d '/+=')
+        log_info "Generated MySQL password for user '${db_user}'"
+    fi
+
+    # Create database and user via mysql CLI (uses auth_socket as root)
+    log_info "Creating database '${db_name}' and user '${db_user}'..."
+    mysql <<EOSQL
+CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+FLUSH PRIVILEGES;
+EOSQL
+    log_ok "Database '${db_name}' and user '${db_user}' ready"
+
+    # Update .env with correct credentials
+    sed -i "s/^DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
+    sed -i "s/^DB_USERNAME=.*/DB_USERNAME=${db_user}/" .env
+    sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${db_pass}/" .env
+    log_ok "Updated .env with database credentials"
 
     # Run migrations
     log_info "Running migrations..."
