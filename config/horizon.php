@@ -239,24 +239,27 @@ return [
     'environments' => [
         'production' => [
             'supervisor-1' => [
-                'maxProcesses' => 10,
+                'minProcesses' => 1,
+                'maxProcesses' => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
             'supervisor-backups' => [
-                'maxProcesses' => 3,
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
             ],
             'supervisor-installs' => [
-                'maxProcesses' => 2,
+                'minProcesses' => 1,
+                'maxProcesses' => 1,
             ],
         ],
 
         'local' => [
             'supervisor-1' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 2,
             ],
             'supervisor-backups' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 1,
             ],
             'supervisor-installs' => [
                 'maxProcesses' => 1,

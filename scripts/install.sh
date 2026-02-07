@@ -205,7 +205,11 @@ check_system() {
     if [[ $total_swap -lt 1024 ]] && [[ ! -f /swapfile ]]; then
         log_info "Creating 2GB swap file for build process..."
         fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >> "$LOG_FILE" 2>&1 && swapon /swapfile
-        log_ok "Swap file created (2GB)"
+        # Make swap persistent across reboot
+        if ! grep -q '/swapfile' /etc/fstab; then
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        fi
+        log_ok "Swap file created (2GB, persistent)"
     fi
 }
 
@@ -568,6 +572,48 @@ configure_system() {
     chmod 600 /etc/rclone/rclone.conf
     log_ok "Directories created"
 
+    # Tune MySQL for low memory VPS (< 4GB RAM)
+    local total_ram
+    total_ram=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+    if [[ $total_ram -lt 4096 ]]; then
+        log_info "Tuning MySQL for low-memory server (${total_ram}MB RAM)..."
+        local mysql_tune="/etc/mysql/mysql.conf.d/99-vsispanel-tune.cnf"
+        cat > "$mysql_tune" <<'MYSQLEOF'
+[mysqld]
+# VSISPanel low-memory tuning
+innodb_buffer_pool_size = 128M
+innodb_log_buffer_size = 8M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+key_buffer_size = 8M
+max_connections = 50
+thread_cache_size = 4
+table_open_cache = 200
+tmp_table_size = 16M
+max_heap_table_size = 16M
+sort_buffer_size = 256K
+read_buffer_size = 256K
+join_buffer_size = 256K
+performance_schema = OFF
+MYSQLEOF
+        systemctl restart mysql >> "$LOG_FILE" 2>&1 || true
+        log_ok "MySQL tuned (128MB buffer pool, perf_schema off)"
+    fi
+
+    # Tune Redis memory limit
+    log_info "Configuring Redis memory limit..."
+    if [[ -f /etc/redis/redis.conf ]]; then
+        # Set maxmemory based on total RAM
+        local redis_max="64mb"
+        if [[ $total_ram -gt 4096 ]]; then
+            redis_max="128mb"
+        fi
+        sed -i '/^# maxmemory <bytes>/a maxmemory '"${redis_max}" /etc/redis/redis.conf 2>/dev/null || true
+        sed -i '/^# maxmemory-policy/a maxmemory-policy allkeys-lru' /etc/redis/redis.conf 2>/dev/null || true
+        systemctl restart redis-server >> "$LOG_FILE" 2>&1 || true
+        log_ok "Redis limited to ${redis_max}"
+    fi
+
     # Crontab for Laravel scheduler
     log_info "Setting up crontab..."
     if command -v crontab &>/dev/null; then
@@ -606,6 +652,17 @@ configure_system() {
     nginx -t >> "$LOG_FILE" 2>&1
     systemctl reload nginx
     log_ok "Nginx configured on port 8443 (SSL)"
+
+    # Tune PHP-FPM for low memory
+    local fpm_pool="/etc/php/8.3/fpm/pool.d/www.conf"
+    if [[ -f "$fpm_pool" ]] && [[ $total_ram -lt 4096 ]]; then
+        log_info "Tuning PHP-FPM for low-memory server..."
+        sed -i 's/^pm = .*/pm = ondemand/' "$fpm_pool"
+        sed -i 's/^pm.max_children = .*/pm.max_children = 5/' "$fpm_pool"
+        sed -i '/^;pm.process_idle_timeout/s/^;//' "$fpm_pool"
+        sed -i 's/^pm.process_idle_timeout = .*/pm.process_idle_timeout = 10s/' "$fpm_pool"
+        log_ok "PHP-FPM set to ondemand (max 5, idle timeout 10s)"
+    fi
 
     # Ensure PHP-FPM is running
     systemctl enable php8.3-fpm >> "$LOG_FILE" 2>&1 || true
@@ -710,8 +767,10 @@ SVCEOF
     systemctl daemon-reload
     log_ok "Panel systemd service files installed"
 
-    # Enable and start panel services
-    for svc in vsispanel-web vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
+    # Enable and start panel services (skip vsispanel-web — Nginx+PHP-FPM handles web)
+    # vsispanel-web unit file is installed for AppManager detection but NOT started
+    systemctl enable vsispanel-web.service >> "$LOG_FILE" 2>&1 || true
+    for svc in vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
         systemctl enable "${svc}.service" >> "$LOG_FILE" 2>&1 || true
         systemctl start "${svc}.service" >> "$LOG_FILE" 2>&1 || true
     done

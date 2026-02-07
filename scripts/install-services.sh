@@ -173,7 +173,12 @@ enable_services() {
     log_info "Reloading systemd daemon..."
     systemctl daemon-reload
 
-    local services=("vsispanel-web" "vsispanel-horizon" "vsispanel-terminal")
+    # vsispanel-web: only enable (not start) — Nginx+PHP-FPM handles web in production
+    log_info "Enabling vsispanel-web.service (not started — Nginx+PHP-FPM handles web)..."
+    systemctl enable vsispanel-web.service
+    log_ok "vsispanel-web.service enabled"
+
+    local services=("vsispanel-horizon" "vsispanel-terminal")
 
     # Only enable Reverb if the package is installed
     if cd "$PANEL_DIR" && $PHP_BIN artisan list 2>/dev/null | grep -q "reverb:start"; then
