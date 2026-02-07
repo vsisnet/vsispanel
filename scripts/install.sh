@@ -24,6 +24,7 @@ LOG_FILE="${LOG_DIR}/install.log"
 SKIP_MAIL=false
 SKIP_DNS=false
 NON_INTERACTIVE=false
+ADMIN_PASS=""
 
 # Colors
 RED='\033[0;31m'
@@ -400,6 +401,11 @@ EOSQL
     fi
     log_ok "Migrations complete"
 
+    # Generate random admin password and set in .env
+    ADMIN_PASS=$(openssl rand -base64 12 | tr -d '/+=')
+    sed -i '/^ADMIN_PASSWORD=/d' .env
+    echo "ADMIN_PASSWORD=${ADMIN_PASS}" >> .env
+
     # Run seeders
     log_info "Running seeders..."
     if ! php artisan db:seed --force >> "$LOG_FILE" 2>&1; then
@@ -408,6 +414,9 @@ EOSQL
         exit 1
     fi
     log_ok "Seeding complete"
+
+    # Remove admin password from .env (no longer needed)
+    sed -i '/^ADMIN_PASSWORD=/d' .env
 }
 
 #-----------------------------------------------------------------------------
@@ -523,7 +532,7 @@ print_complete() {
     echo ""
     echo -e "  Panel URL:      ${CYAN}https://${server_ip}:8443${NC}"
     echo -e "  Admin Email:    ${CYAN}admin@vsispanel.local${NC}"
-    echo -e "  Admin Password: ${CYAN}Quanghuy@@3112${NC}"
+    echo -e "  Admin Password: ${CYAN}${ADMIN_PASS}${NC}"
     echo ""
     echo -e "  ${YELLOW}⚠  Please change the default password after first login!${NC}"
     echo -e "  ${YELLOW}⚠  The SSL certificate is self-signed. Your browser will show a warning.${NC}"
