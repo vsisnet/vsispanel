@@ -11,6 +11,7 @@
 #   --skip-mail       Skip mail server (Postfix/Dovecot) installation
 #   --skip-dns        Skip DNS server (PowerDNS) installation
 #   --non-interactive Skip all prompts, use defaults
+#   --uninstall       Remove VSISPanel completely (keeps system packages)
 #   --help            Show this help message
 #=============================================================================
 
@@ -45,6 +46,96 @@ step() {
 }
 
 #-----------------------------------------------------------------------------
+# Uninstall VSISPanel
+#-----------------------------------------------------------------------------
+do_uninstall() {
+    echo ""
+    echo -e "${RED}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║     VSISPanel Uninstaller                    ║${NC}"
+    echo -e "${RED}╚══════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}[ERROR]${NC} Must be run as root"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}This will remove VSISPanel completely:${NC}"
+    echo "  - Stop and remove all vsispanel systemd services"
+    echo "  - Remove Nginx site config and SSL certificate"
+    echo "  - Remove Supervisor configs"
+    echo "  - Drop MySQL database and user 'vsispanel'"
+    echo "  - Remove /opt/vsispanel directory"
+    echo "  - Remove crontab entry"
+    echo ""
+    echo -e "${YELLOW}System packages (PHP, MySQL, Redis, Nginx, etc.) will NOT be removed.${NC}"
+    echo ""
+    read -rp "Are you sure? (y/N): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
+
+    echo ""
+
+    # Stop and remove panel systemd services
+    echo -e "${CYAN}[1/7]${NC} Stopping panel services..."
+    for svc in vsispanel-web vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
+        systemctl stop "${svc}.service" 2>/dev/null || true
+        systemctl disable "${svc}.service" 2>/dev/null || true
+        rm -f "/etc/systemd/system/${svc}.service"
+    done
+    systemctl daemon-reload
+    echo -e "${GREEN}  ✓${NC} Panel services removed"
+
+    # Remove Supervisor configs
+    echo -e "${CYAN}[2/7]${NC} Removing Supervisor configs..."
+    supervisorctl stop all 2>/dev/null || true
+    rm -f /etc/supervisor/conf.d/vsispanel-*.conf
+    supervisorctl reread 2>/dev/null || true
+    supervisorctl update 2>/dev/null || true
+    echo -e "${GREEN}  ✓${NC} Supervisor configs removed"
+
+    # Remove Nginx config and SSL
+    echo -e "${CYAN}[3/7]${NC} Removing Nginx config and SSL certificate..."
+    rm -f /etc/nginx/sites-enabled/vsispanel.conf
+    rm -f /etc/nginx/sites-available/vsispanel.conf
+    rm -rf /etc/ssl/vsispanel
+    # Restore default site if available
+    if [[ -f /etc/nginx/sites-available/default ]]; then
+        ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
+    fi
+    systemctl reload nginx 2>/dev/null || true
+    echo -e "${GREEN}  ✓${NC} Nginx config and SSL removed"
+
+    # Drop database and user
+    echo -e "${CYAN}[4/7]${NC} Dropping database and user..."
+    mysql -e "DROP DATABASE IF EXISTS vsispanel; DROP USER IF EXISTS 'vsispanel'@'localhost'; FLUSH PRIVILEGES;" 2>/dev/null || true
+    echo -e "${GREEN}  ✓${NC} Database 'vsispanel' dropped"
+
+    # Remove crontab entry
+    echo -e "${CYAN}[5/7]${NC} Removing crontab entry..."
+    crontab -l 2>/dev/null | grep -v "schedule:run" | crontab - 2>/dev/null || true
+    echo -e "${GREEN}  ✓${NC} Crontab entry removed"
+
+    # Remove rclone config
+    echo -e "${CYAN}[6/7]${NC} Removing backup configs..."
+    rm -rf /etc/rclone /var/backups/vsispanel
+    echo -e "${GREEN}  ✓${NC} Backup configs removed"
+
+    # Remove source code
+    echo -e "${CYAN}[7/7]${NC} Removing /opt/vsispanel..."
+    rm -rf /opt/vsispanel
+    echo -e "${GREEN}  ✓${NC} Source code removed"
+
+    echo ""
+    echo -e "${GREEN}VSISPanel has been completely removed.${NC}"
+    echo -e "System packages (PHP, MySQL, Redis, Nginx, etc.) were kept."
+    echo -e "To reinstall: ${CYAN}curl -sSL https://raw.githubusercontent.com/vsisnet/vsispanel/main/scripts/install.sh | bash${NC}"
+    echo ""
+}
+
+#-----------------------------------------------------------------------------
 # Parse arguments
 #-----------------------------------------------------------------------------
 parse_args() {
@@ -53,6 +144,7 @@ parse_args() {
             --skip-mail) SKIP_MAIL=true ;;
             --skip-dns)  SKIP_DNS=true ;;
             --non-interactive) NON_INTERACTIVE=true ;;
+            --uninstall) do_uninstall; exit 0 ;;
             --help)
                 echo "Usage: sudo bash install.sh [OPTIONS]"
                 echo ""
@@ -60,6 +152,7 @@ parse_args() {
                 echo "  --skip-mail       Skip Postfix/Dovecot installation"
                 echo "  --skip-dns        Skip PowerDNS installation"
                 echo "  --non-interactive Use default values, no prompts"
+                echo "  --uninstall       Remove VSISPanel completely"
                 echo "  --help            Show this help"
                 exit 0
                 ;;
