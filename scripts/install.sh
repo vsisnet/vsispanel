@@ -358,19 +358,10 @@ setup_database() {
 
     local db_name db_user db_pass
 
-    db_name=$(grep "^DB_DATABASE=" .env | cut -d= -f2 | tr -d '"')
-    db_name=${db_name:-vsispanel}
-
-    db_user=$(grep "^DB_USERNAME=" .env | cut -d= -f2 | tr -d '"')
-    db_user=${db_user:-vsispanel}
-
-    db_pass=$(grep "^DB_PASSWORD=" .env | cut -d= -f2 | tr -d '"')
-
-    # Generate password if empty
-    if [[ -z "$db_pass" ]]; then
-        db_pass=$(openssl rand -base64 24 | tr -d '/+=')
-        log_info "Generated MySQL password for user '${db_user}'"
-    fi
+    db_name="vsispanel"
+    db_user="vsispanel"
+    db_pass=$(openssl rand -base64 24 | tr -d '/+=')
+    log_info "Generated MySQL password for user '${db_user}'"
 
     # Create database and user via mysql CLI (uses auth_socket as root)
     log_info "Creating database '${db_name}' and user '${db_user}'..."
