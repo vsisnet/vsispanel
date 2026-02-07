@@ -22,4 +22,16 @@ export default defineConfig({
             '@': '/resources/js',
         },
     },
+    build: {
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vendor-vue': ['vue', 'vue-router', 'pinia', 'vue-i18n'],
+                    'vendor-charts': ['apexcharts', 'vue3-apexcharts'],
+                    'vendor-utils': ['axios'],
+                },
+            },
+        },
+    },
 });

@@ -58,20 +58,25 @@ class AlertController extends Controller
      */
     public function summary(): JsonResponse
     {
-        $totalRules = AlertRule::count();
-        $activeRules = AlertRule::where('is_active', true)->count();
-        $unresolvedAlerts = AlertHistory::unresolved()->count();
-        $criticalUnresolved = AlertHistory::unresolved()->where('severity', 'critical')->count();
-        $last24h = AlertHistory::where('triggered_at', '>=', now()->subDay())->count();
+        // Single aggregation query for rule stats
+        $ruleStats = AlertRule::selectRaw("COUNT(*) as total_rules")
+            ->selectRaw("SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_rules")
+            ->first();
+
+        // Single aggregation query for alert history stats
+        $historyStats = AlertHistory::selectRaw("SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) as unresolved_alerts")
+            ->selectRaw("SUM(CASE WHEN resolved_at IS NULL AND severity = 'critical' THEN 1 ELSE 0 END) as critical_unresolved")
+            ->selectRaw("SUM(CASE WHEN triggered_at >= ? THEN 1 ELSE 0 END) as last_24h", [now()->subDay()])
+            ->first();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'total_rules' => $totalRules,
-                'active_rules' => $activeRules,
-                'unresolved_alerts' => $unresolvedAlerts,
-                'critical_unresolved' => $criticalUnresolved,
-                'last_24h' => $last24h,
+                'total_rules' => (int) $ruleStats->total_rules,
+                'active_rules' => (int) $ruleStats->active_rules,
+                'unresolved_alerts' => (int) ($historyStats->unresolved_alerts ?? 0),
+                'critical_unresolved' => (int) ($historyStats->critical_unresolved ?? 0),
+                'last_24h' => (int) ($historyStats->last_24h ?? 0),
             ],
         ]);
     }

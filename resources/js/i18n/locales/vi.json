@@ -2039,5 +2039,108 @@
       "testSuccess": "Gửi thông báo thử thành công",
       "testError": "Gửi thông báo thử thất bại"
     }
+  },
+  "about": {
+    "title": "Giới thiệu",
+    "systemInfo": "Thông tin hệ thống",
+    "panelVersion": "Phiên bản Panel",
+    "phpVersion": "Phiên bản PHP",
+    "mysqlVersion": "Phiên bản MySQL",
+    "redisVersion": "Phiên bản Redis",
+    "nginxVersion": "Phiên bản Nginx",
+    "os": "Hệ điều hành",
+    "hostname": "Tên máy chủ",
+    "uptime": "Thời gian hoạt động",
+    "license": "Giấy phép",
+    "licenseDescription": "VSISPanel được cấp phép theo Giấy phép Công cộng GNU v3.0. Điều này có nghĩa là bạn được tự do sử dụng, chỉnh sửa và phân phối phần mềm này, với điều kiện mọi sản phẩm phái sinh cũng phải được cấp phép theo GPL v3.",
+    "licensePermission1": "Tự do sử dụng phần mềm cho bất kỳ mục đích nào",
+    "licensePermission2": "Tự do chỉnh sửa mã nguồn và phân phối các thay đổi của bạn",
+    "licensePermission3": "Tự do chia sẻ phần mềm với người khác",
+    "viewFullLicense": "Xem toàn bộ nội dung giấy phép",
+    "credits": "Công nghệ sử dụng",
+    "builtWith": "VSISPanel được xây dựng với các công nghệ mã nguồn mở sau:",
+    "openSource": "VSISPanel là phần mềm miễn phí và mã nguồn mở."
+  },
+  "setup": {
+    "title": "Trình hướng dẫn cài đặt VSISPanel",
+    "description": "Làm theo các bước bên dưới để cấu hình bảng điều khiển hosting của bạn.",
+    "finishAndInstall": "Hoàn tất & Cài đặt",
+    "steps": {
+      "requirements": "Yêu cầu",
+      "database": "Cơ sở dữ liệu",
+      "admin": "Quản trị",
+      "server": "Máy chủ",
+      "complete": "Hoàn tất"
+    },
+    "requirements": {
+      "title": "Yêu cầu hệ thống",
+      "description": "Đảm bảo máy chủ của bạn đáp ứng tất cả các yêu cầu trước khi tiếp tục.",
+      "checking": "Đang kiểm tra yêu cầu hệ thống...",
+      "ok": "Đạt",
+      "missing": "Thiếu",
+      "retry": "Kiểm tra lại",
+      "checkFailed": "Không thể kiểm tra yêu cầu hệ thống. Vui lòng thử lại."
+    },
+    "database": {
+      "title": "Cấu hình cơ sở dữ liệu",
+      "description": "Cấu hình kết nối cơ sở dữ liệu cho VSISPanel.",
+      "host": "Máy chủ CSDL",
+      "port": "Cổng",
+      "name": "Tên cơ sở dữ liệu",
+      "username": "Tên đăng nhập",
+      "password": "Mật khẩu",
+      "testing": "Đang kiểm tra...",
+      "testConnection": "Kiểm tra kết nối",
+      "connectionSuccess": "Kết nối thành công",
+      "connectionFailed": "Kết nối thất bại. Vui lòng kiểm tra lại cấu hình cơ sở dữ liệu."
+    },
+    "admin": {
+      "title": "Tài khoản quản trị viên",
+      "description": "Tạo tài khoản quản trị viên để quản lý bảng điều khiển.",
+      "name": "Họ và tên",
+      "namePlaceholder": "Nhập họ và tên của bạn",
+      "email": "Địa chỉ email",
+      "emailPlaceholder": "admin@example.com",
+      "password": "Mật khẩu",
+      "passwordPlaceholder": "Tối thiểu 8 ký tự",
+      "confirmPassword": "Xác nhận mật khẩu",
+      "confirmPasswordPlaceholder": "Nhập lại mật khẩu",
+      "timezone": "Múi giờ",
+      "language": "Ngôn ngữ",
+      "nameRequired": "Vui lòng nhập họ tên",
+      "emailRequired": "Vui lòng nhập email",
+      "emailInvalid": "Vui lòng nhập địa chỉ email hợp lệ",
+      "passwordRequired": "Vui lòng nhập mật khẩu",
+      "passwordMinLength": "Mật khẩu phải có ít nhất 8 ký tự",
+      "passwordMismatch": "Mật khẩu xác nhận không khớp"
+    },
+    "server": {
+      "title": "Cấu hình máy chủ",
+      "description": "Cấu hình cài đặt cơ bản của máy chủ và kích hoạt các dịch vụ.",
+      "hostname": "Tên máy chủ",
+      "hostnamePlaceholder": "server.example.com",
+      "ip": "Địa chỉ IP máy chủ",
+      "ipPlaceholder": "Ví dụ: 192.168.1.1",
+      "services": "Kích hoạt dịch vụ",
+      "enableMail": "Máy chủ Mail",
+      "enableMailDesc": "Postfix & Dovecot để lưu trữ email",
+      "enableDns": "Máy chủ DNS",
+      "enableDnsDesc": "PowerDNS để quản lý vùng DNS",
+      "enableFtp": "Máy chủ FTP",
+      "enableFtpDesc": "ProFTPD để truy cập truyền tệp"
+    },
+    "complete": {
+      "installing": "Đang cài đặt VSISPanel...",
+      "installingDesc": "Vui lòng đợi trong khi hệ thống đang được cấu hình. Quá trình này có thể mất vài phút.",
+      "taskDatabase": "Đang cấu hình cơ sở dữ liệu...",
+      "taskAdmin": "Đang tạo tài khoản quản trị viên...",
+      "taskServer": "Đang thiết lập cấu hình máy chủ...",
+      "successTitle": "Cài đặt hoàn tất!",
+      "successDesc": "VSISPanel đã được cài đặt thành công. Bạn có thể đăng nhập bằng tài khoản quản trị viên.",
+      "goToLogin": "Đến trang đăng nhập",
+      "errorTitle": "Cài đặt thất bại",
+      "retry": "Thử lại cài đặt",
+      "installFailed": "Cài đặt thất bại. Vui lòng kiểm tra nhật ký và thử lại."
+    }
   }
 }

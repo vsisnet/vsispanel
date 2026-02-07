@@ -28,12 +28,29 @@ class CronController extends Controller
             $query = CronJob::with('user')->orderBy('created_at', 'desc');
         }
 
+        // Pre-compute human-readable schedules map to avoid repeated parsing
+        $presets = [
+            '* * * * *' => 'Every minute',
+            '*/5 * * * *' => 'Every 5 minutes',
+            '*/15 * * * *' => 'Every 15 minutes',
+            '*/30 * * * *' => 'Every 30 minutes',
+            '0 * * * *' => 'Every hour',
+            '0 */2 * * *' => 'Every 2 hours',
+            '0 */6 * * *' => 'Every 6 hours',
+            '0 */12 * * *' => 'Every 12 hours',
+            '0 0 * * *' => 'Daily at midnight',
+            '0 0 * * 0' => 'Weekly on Sunday',
+            '0 0 1 * *' => 'Monthly on the 1st',
+        ];
+
+        $jobs = $query->get();
+        $jobs->each(function ($job) use ($presets) {
+            $job->schedule_human = $presets[$job->schedule] ?? $job->schedule;
+        });
+
         return response()->json([
             'success' => true,
-            'data' => $query->get()->map(function ($job) {
-                $job->schedule_human = $this->cronService->toHumanReadable($job->schedule);
-                return $job;
-            }),
+            'data' => $jobs,
         ]);
     }
 

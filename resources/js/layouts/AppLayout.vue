@@ -20,6 +20,13 @@
         <!-- Page Content -->
         <slot />
       </div>
+
+      <!-- Footer -->
+      <footer class="px-6 py-4 text-center text-xs text-gray-400 dark:text-gray-600">
+        <router-link to="/about" class="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+          Powered by VSISPanel v1.0.0
+        </router-link>
+      </footer>
     </main>
 
     <!-- Toast Container -->

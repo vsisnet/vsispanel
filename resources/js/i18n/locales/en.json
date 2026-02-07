@@ -2055,5 +2055,108 @@
       "testSuccess": "Test notification sent successfully",
       "testError": "Failed to send test notification"
     }
+  },
+  "about": {
+    "title": "About",
+    "systemInfo": "System Information",
+    "panelVersion": "Panel Version",
+    "phpVersion": "PHP Version",
+    "mysqlVersion": "MySQL Version",
+    "redisVersion": "Redis Version",
+    "nginxVersion": "Nginx Version",
+    "os": "Operating System",
+    "hostname": "Hostname",
+    "uptime": "Uptime",
+    "license": "License",
+    "licenseDescription": "VSISPanel is licensed under the GNU General Public License v3.0. This means you are free to use, modify, and distribute this software, provided that any derivative works are also licensed under the GPL v3.",
+    "licensePermission1": "Freedom to use the software for any purpose",
+    "licensePermission2": "Freedom to modify the source code and distribute your changes",
+    "licensePermission3": "Freedom to share the software with others",
+    "viewFullLicense": "View full license text",
+    "credits": "Credits",
+    "builtWith": "VSISPanel is built with the following open-source technologies:",
+    "openSource": "VSISPanel is free and open-source software."
+  },
+  "setup": {
+    "title": "VSISPanel Setup Wizard",
+    "description": "Follow the steps below to configure your hosting control panel.",
+    "finishAndInstall": "Finish & Install",
+    "steps": {
+      "requirements": "Requirements",
+      "database": "Database",
+      "admin": "Admin",
+      "server": "Server",
+      "complete": "Complete"
+    },
+    "requirements": {
+      "title": "System Requirements",
+      "description": "Make sure your server meets all the requirements before proceeding.",
+      "checking": "Checking system requirements...",
+      "ok": "OK",
+      "missing": "Missing",
+      "retry": "Retry check",
+      "checkFailed": "Failed to check system requirements. Please try again."
+    },
+    "database": {
+      "title": "Database Configuration",
+      "description": "Configure the database connection for VSISPanel.",
+      "host": "Database Host",
+      "port": "Port",
+      "name": "Database Name",
+      "username": "Username",
+      "password": "Password",
+      "testing": "Testing...",
+      "testConnection": "Test Connection",
+      "connectionSuccess": "Connection successful",
+      "connectionFailed": "Connection failed. Please check your database settings."
+    },
+    "admin": {
+      "title": "Administrator Account",
+      "description": "Create the administrator account for managing your panel.",
+      "name": "Full Name",
+      "namePlaceholder": "Enter your full name",
+      "email": "Email Address",
+      "emailPlaceholder": "admin@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "Minimum 8 characters",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Re-enter your password",
+      "timezone": "Timezone",
+      "language": "Language",
+      "nameRequired": "Name is required",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Please enter a valid email address",
+      "passwordRequired": "Password is required",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordMismatch": "Passwords do not match"
+    },
+    "server": {
+      "title": "Server Configuration",
+      "description": "Configure the basic server settings and enable services.",
+      "hostname": "Server Hostname",
+      "hostnamePlaceholder": "server.example.com",
+      "ip": "Server IP Address",
+      "ipPlaceholder": "e.g. 192.168.1.1",
+      "services": "Enable Services",
+      "enableMail": "Mail Server",
+      "enableMailDesc": "Postfix & Dovecot for email hosting",
+      "enableDns": "DNS Server",
+      "enableDnsDesc": "PowerDNS for DNS zone management",
+      "enableFtp": "FTP Server",
+      "enableFtpDesc": "ProFTPD for file transfer access"
+    },
+    "complete": {
+      "installing": "Installing VSISPanel...",
+      "installingDesc": "Please wait while the system is being configured. This may take a few minutes.",
+      "taskDatabase": "Configuring database...",
+      "taskAdmin": "Creating administrator account...",
+      "taskServer": "Setting up server configuration...",
+      "successTitle": "Installation Complete!",
+      "successDesc": "VSISPanel has been successfully installed. You can now log in with your administrator account.",
+      "goToLogin": "Go to Login",
+      "errorTitle": "Installation Failed",
+      "retry": "Retry Installation",
+      "installFailed": "Installation failed. Please check the logs and try again."
+    }
   }
 }

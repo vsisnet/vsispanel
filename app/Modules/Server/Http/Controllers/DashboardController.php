@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Server\Services\SystemInfoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\Models\Activity;
 
 class DashboardController extends Controller
@@ -141,15 +142,16 @@ class DashboardController extends Controller
             ]);
         }
 
-        $systemInfo = $this->systemInfoService->getSystemInfo();
-        $services = $this->systemInfoService->getServicesStatus();
+        $data = Cache::remember('vsispanel:system_info', 30, function () {
+            return [
+                'system' => $this->systemInfoService->getSystemInfo(),
+                'services' => $this->systemInfoService->getServicesStatus(),
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'system' => $systemInfo,
-                'services' => $services,
-            ],
+            'data' => $data,
         ]);
     }
 
@@ -158,18 +160,22 @@ class DashboardController extends Controller
      */
     public function realtime(Request $request): JsonResponse
     {
-        $cpu = $this->systemInfoService->getCpuUsage();
-        $memory = $this->systemInfoService->getMemoryUsage();
+        $data = Cache::remember('vsispanel:metrics:realtime', 15, function () {
+            $cpu = $this->systemInfoService->getCpuUsage();
+            $memory = $this->systemInfoService->getMemoryUsage();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+            return [
                 'cpu_percentage' => $cpu['percentage'],
                 'cpu_load' => $cpu['load_1min'],
                 'memory_percentage' => $memory['percentage'],
                 'memory_used' => $memory['used'],
                 'timestamp' => now()->toIso8601String(),
-            ],
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
         ]);
     }
 }

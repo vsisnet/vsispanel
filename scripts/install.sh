@@ -1,0 +1,425 @@
+#!/bin/bash
+#=============================================================================
+# VSISPanel - Full Installation Script
+# Installs all dependencies and sets up VSISPanel on a fresh Ubuntu server.
+#
+# Usage: sudo bash /opt/vsispanel/scripts/install.sh [OPTIONS]
+#
+# Options:
+#   --skip-mail       Skip mail server (Postfix/Dovecot) installation
+#   --skip-dns        Skip DNS server (PowerDNS) installation
+#   --non-interactive Skip all prompts, use defaults
+#   --help            Show this help message
+#=============================================================================
+
+set -euo pipefail
+
+PANEL_DIR="/opt/vsispanel"
+LOG_DIR="/var/log/vsispanel"
+LOG_FILE="${LOG_DIR}/install.log"
+
+SKIP_MAIL=false
+SKIP_DNS=false
+NON_INTERACTIVE=false
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+log_info()  { echo -e "${CYAN}[INFO]${NC} $1" | tee -a "$LOG_FILE"; }
+log_ok()    { echo -e "${GREEN}  ✓${NC} $1" | tee -a "$LOG_FILE"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1" | tee -a "$LOG_FILE"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"; }
+
+step() {
+    echo "" | tee -a "$LOG_FILE"
+    echo -e "${BOLD}━━━ Step $1: $2 ━━━${NC}" | tee -a "$LOG_FILE"
+}
+
+#-----------------------------------------------------------------------------
+# Parse arguments
+#-----------------------------------------------------------------------------
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skip-mail) SKIP_MAIL=true ;;
+            --skip-dns)  SKIP_DNS=true ;;
+            --non-interactive) NON_INTERACTIVE=true ;;
+            --help)
+                echo "Usage: sudo bash install.sh [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --skip-mail       Skip Postfix/Dovecot installation"
+                echo "  --skip-dns        Skip PowerDNS installation"
+                echo "  --non-interactive Use default values, no prompts"
+                echo "  --help            Show this help"
+                exit 0
+                ;;
+            *) log_error "Unknown option: $1"; exit 1 ;;
+        esac
+        shift
+    done
+}
+
+#-----------------------------------------------------------------------------
+# Check system requirements
+#-----------------------------------------------------------------------------
+check_system() {
+    step "1/8" "Checking system requirements"
+
+    if [[ $EUID -ne 0 ]]; then
+        log_error "This script must be run as root (use sudo)"
+        exit 1
+    fi
+
+    # Check OS
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        log_ok "OS: ${PRETTY_NAME}"
+        if [[ "$ID" != "ubuntu" ]]; then
+            log_warn "Recommended OS: Ubuntu 22.04/24.04. Current: ${ID} ${VERSION_ID}"
+        fi
+    fi
+
+    # Check RAM (minimum 2GB)
+    local total_ram
+    total_ram=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+    if [[ $total_ram -lt 1800 ]]; then
+        log_error "Minimum 2GB RAM required. Current: ${total_ram}MB"
+        exit 1
+    fi
+    log_ok "RAM: ${total_ram}MB"
+
+    # Check disk (minimum 10GB free)
+    local free_disk
+    free_disk=$(df -BG / | awk 'NR==2 {gsub(/G/,""); print $4}')
+    if [[ $free_disk -lt 10 ]]; then
+        log_warn "Recommended 10GB free disk. Current: ${free_disk}GB"
+    fi
+    log_ok "Disk: ${free_disk}GB free"
+}
+
+#-----------------------------------------------------------------------------
+# Install system dependencies
+#-----------------------------------------------------------------------------
+install_dependencies() {
+    step "2/8" "Installing system dependencies"
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq >> "$LOG_FILE" 2>&1
+
+    # Essential packages
+    log_info "Installing essential packages..."
+    apt-get install -y -qq software-properties-common curl wget git unzip zip \
+        apt-transport-https ca-certificates lsb-release gnupg2 >> "$LOG_FILE" 2>&1
+    log_ok "Essential packages installed"
+}
+
+#-----------------------------------------------------------------------------
+# Install PHP 8.3
+#-----------------------------------------------------------------------------
+install_php() {
+    step "3/8" "Installing PHP 8.3"
+
+    if command -v php &>/dev/null && php -v | grep -q "8.3"; then
+        log_ok "PHP 8.3 already installed"
+        return
+    fi
+
+    add-apt-repository -y ppa:ondrej/php >> "$LOG_FILE" 2>&1
+    apt-get update -qq >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq php8.3-fpm php8.3-cli php8.3-common php8.3-mysql \
+        php8.3-pgsql php8.3-sqlite3 php8.3-redis php8.3-mbstring php8.3-xml \
+        php8.3-bcmath php8.3-curl php8.3-zip php8.3-gd php8.3-intl \
+        php8.3-readline php8.3-soap php8.3-imap php8.3-opcache >> "$LOG_FILE" 2>&1
+    log_ok "PHP 8.3 installed: $(php -v | head -1 | awk '{print $2}')"
+}
+
+#-----------------------------------------------------------------------------
+# Install Composer
+#-----------------------------------------------------------------------------
+install_composer() {
+    if command -v composer &>/dev/null; then
+        log_ok "Composer already installed"
+        return
+    fi
+
+    log_info "Installing Composer..."
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer >> "$LOG_FILE" 2>&1
+    log_ok "Composer installed"
+}
+
+#-----------------------------------------------------------------------------
+# Install Node.js 20
+#-----------------------------------------------------------------------------
+install_nodejs() {
+    if command -v node &>/dev/null && node -v | grep -q "v2[0-9]"; then
+        log_ok "Node.js already installed: $(node -v)"
+        return
+    fi
+
+    log_info "Installing Node.js 20..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq nodejs >> "$LOG_FILE" 2>&1
+    log_ok "Node.js installed: $(node -v)"
+}
+
+#-----------------------------------------------------------------------------
+# Install services (MySQL, Redis, Nginx)
+#-----------------------------------------------------------------------------
+install_services() {
+    step "4/8" "Installing services"
+
+    # MySQL
+    if command -v mysql &>/dev/null; then
+        log_ok "MySQL already installed"
+    else
+        log_info "Installing MySQL 8.0..."
+        apt-get install -y -qq mysql-server >> "$LOG_FILE" 2>&1
+        systemctl enable mysql >> "$LOG_FILE" 2>&1
+        systemctl start mysql
+        log_ok "MySQL installed"
+    fi
+
+    # Redis
+    if command -v redis-cli &>/dev/null; then
+        log_ok "Redis already installed"
+    else
+        log_info "Installing Redis..."
+        apt-get install -y -qq redis-server >> "$LOG_FILE" 2>&1
+        systemctl enable redis-server >> "$LOG_FILE" 2>&1
+        systemctl start redis-server
+        log_ok "Redis installed"
+    fi
+
+    # Nginx
+    if command -v nginx &>/dev/null; then
+        log_ok "Nginx already installed"
+    else
+        log_info "Installing Nginx..."
+        apt-get install -y -qq nginx >> "$LOG_FILE" 2>&1
+        systemctl enable nginx >> "$LOG_FILE" 2>&1
+        systemctl start nginx
+        log_ok "Nginx installed"
+    fi
+
+    # Optional: Mail server
+    if [[ "$SKIP_MAIL" == false ]]; then
+        log_info "Installing mail services (Postfix, Dovecot)..."
+        apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-pop3d >> "$LOG_FILE" 2>&1 || true
+        log_ok "Mail services installed"
+    else
+        log_warn "Skipped mail server installation (--skip-mail)"
+    fi
+
+    # Optional: DNS server
+    if [[ "$SKIP_DNS" == false ]]; then
+        log_info "Installing PowerDNS..."
+        apt-get install -y -qq pdns-server pdns-backend-mysql >> "$LOG_FILE" 2>&1 || true
+        log_ok "PowerDNS installed"
+    else
+        log_warn "Skipped DNS server installation (--skip-dns)"
+    fi
+
+    # Certbot for SSL
+    if ! command -v certbot &>/dev/null; then
+        log_info "Installing Certbot..."
+        apt-get install -y -qq certbot python3-certbot-nginx >> "$LOG_FILE" 2>&1
+        log_ok "Certbot installed"
+    fi
+
+    # Restic for backups
+    if ! command -v restic &>/dev/null; then
+        log_info "Installing Restic..."
+        apt-get install -y -qq restic >> "$LOG_FILE" 2>&1
+        log_ok "Restic installed"
+    fi
+
+    # Rclone for remote sync
+    if ! command -v rclone &>/dev/null; then
+        log_info "Installing Rclone..."
+        curl -s https://rclone.org/install.sh | bash >> "$LOG_FILE" 2>&1 || apt-get install -y -qq rclone >> "$LOG_FILE" 2>&1
+        log_ok "Rclone installed"
+    fi
+
+    # Supervisor for queue workers
+    if ! command -v supervisord &>/dev/null; then
+        log_info "Installing Supervisor..."
+        apt-get install -y -qq supervisor >> "$LOG_FILE" 2>&1
+        systemctl enable supervisor >> "$LOG_FILE" 2>&1
+        log_ok "Supervisor installed"
+    fi
+}
+
+#-----------------------------------------------------------------------------
+# Setup VSISPanel application
+#-----------------------------------------------------------------------------
+setup_application() {
+    step "5/8" "Setting up VSISPanel application"
+
+    cd "$PANEL_DIR"
+
+    # Environment file
+    if [[ ! -f .env ]]; then
+        cp .env.example .env
+        log_ok "Created .env from .env.example"
+    fi
+
+    # Install PHP dependencies
+    log_info "Installing PHP dependencies..."
+    composer install --no-interaction --optimize-autoloader --no-dev 2>&1 | tail -3 >> "$LOG_FILE"
+    log_ok "PHP dependencies installed"
+
+    # Install Node dependencies & build
+    log_info "Installing Node.js dependencies..."
+    npm install 2>&1 | tail -3 >> "$LOG_FILE"
+    log_ok "Node.js dependencies installed"
+
+    log_info "Building frontend assets..."
+    npm run build 2>&1 | tail -5 >> "$LOG_FILE"
+    log_ok "Frontend built"
+
+    # Generate app key
+    if grep -q "^APP_KEY=$" .env 2>/dev/null; then
+        php artisan key:generate --force
+        log_ok "Application key generated"
+    fi
+}
+
+#-----------------------------------------------------------------------------
+# Setup database
+#-----------------------------------------------------------------------------
+setup_database() {
+    step "6/8" "Setting up database"
+
+    cd "$PANEL_DIR"
+
+    # Create database if it doesn't exist
+    local db_name
+    db_name=$(grep "^DB_DATABASE=" .env | cut -d= -f2 | tr -d '"')
+    db_name=${db_name:-vsispanel}
+
+    mysql -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || true
+    log_ok "Database '${db_name}' ready"
+
+    # Run migrations
+    log_info "Running migrations..."
+    php artisan migrate --force 2>&1 | tail -5 >> "$LOG_FILE"
+    log_ok "Migrations complete"
+
+    # Run seeders
+    log_info "Running seeders..."
+    php artisan db:seed --force 2>&1 | tail -5 >> "$LOG_FILE"
+    log_ok "Seeding complete"
+}
+
+#-----------------------------------------------------------------------------
+# Configure system
+#-----------------------------------------------------------------------------
+configure_system() {
+    step "7/8" "Configuring system"
+
+    cd "$PANEL_DIR"
+
+    # Permissions
+    chmod -R 775 storage bootstrap/cache
+    log_ok "Permissions set"
+
+    # Storage link
+    if [[ ! -L public/storage ]]; then
+        php artisan storage:link
+        log_ok "Storage link created"
+    fi
+
+    # Directories
+    mkdir -p /etc/rclone /var/backups/vsispanel "$LOG_DIR"
+    chmod 700 /etc/rclone /var/backups/vsispanel
+    touch /etc/rclone/rclone.conf
+    chmod 600 /etc/rclone/rclone.conf
+    log_ok "Directories created"
+
+    # Crontab for Laravel scheduler
+    if ! crontab -l 2>/dev/null | grep -q "schedule:run"; then
+        (crontab -l 2>/dev/null; echo "* * * * * cd ${PANEL_DIR} && php artisan schedule:run >> /dev/null 2>&1") | crontab -
+        log_ok "Laravel scheduler added to crontab"
+    fi
+
+    # Install systemd services
+    if [[ -f "${PANEL_DIR}/scripts/install-services.sh" ]]; then
+        bash "${PANEL_DIR}/scripts/install-services.sh" >> "$LOG_FILE" 2>&1
+        log_ok "Systemd services installed"
+    fi
+
+    # Optimize
+    php artisan vsispanel:optimize 2>&1 | tail -3 >> "$LOG_FILE"
+    log_ok "Application optimized"
+
+    # Mark as installed
+    touch "${PANEL_DIR}/storage/installed"
+    log_ok "Installation marker created"
+}
+
+#-----------------------------------------------------------------------------
+# Print completion
+#-----------------------------------------------------------------------------
+print_complete() {
+    step "8/8" "Installation complete"
+
+    local server_ip
+    server_ip=$(hostname -I | awk '{print $1}')
+
+    echo ""
+    echo -e "${GREEN}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║     VSISPanel Installation Complete!         ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  Panel URL:      ${CYAN}http://${server_ip}:8000${NC}"
+    echo -e "  Admin Email:    ${CYAN}admin@vsispanel.local${NC}"
+    echo -e "  Admin Password: ${CYAN}(set during database seeding)${NC}"
+    echo ""
+    echo -e "  ${BOLD}Next Steps:${NC}"
+    echo -e "  1. Edit ${YELLOW}/opt/vsispanel/.env${NC} with your settings"
+    echo -e "  2. Open the panel URL and complete the setup wizard"
+    echo -e "  3. Change the default admin password"
+    echo ""
+    echo -e "  ${BOLD}Manage Services:${NC}"
+    echo -e "    systemctl status vsispanel-web"
+    echo -e "    systemctl status vsispanel-horizon"
+    echo -e "    systemctl status vsispanel-reverb"
+    echo ""
+    echo -e "  Log file: ${YELLOW}${LOG_FILE}${NC}"
+    echo ""
+}
+
+#-----------------------------------------------------------------------------
+# Main
+#-----------------------------------------------------------------------------
+main() {
+    parse_args "$@"
+
+    mkdir -p "$LOG_DIR"
+    echo "VSISPanel Installation - $(date)" > "$LOG_FILE"
+
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║     VSISPanel Installer v1.0.0               ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    check_system
+    install_dependencies
+    install_php
+    install_composer
+    install_nodejs
+    install_services
+    setup_application
+    setup_database
+    configure_system
+    print_complete
+}
+
+main "$@"

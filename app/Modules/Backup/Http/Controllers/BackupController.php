@@ -396,24 +396,29 @@ class BackupController extends Controller
     {
         $userId = $request->user()->id;
 
+        // Single aggregation query instead of 5 separate queries
+        $backupStats = Backup::where('user_id', $userId)
+            ->selectRaw("COUNT(*) as total_backups")
+            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed_backups", [Backup::STATUS_COMPLETED])
+            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed_backups", [Backup::STATUS_FAILED])
+            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as running_backups", [Backup::STATUS_RUNNING])
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = ? THEN size_bytes ELSE 0 END), 0) as total_size", [Backup::STATUS_COMPLETED])
+            ->first();
+
+        // Single aggregation query for config counts
+        $configStats = BackupConfig::where('user_id', $userId)
+            ->selectRaw("COUNT(*) as configs_count")
+            ->selectRaw("SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_configs")
+            ->first();
+
         $stats = [
-            'total_backups' => Backup::where('user_id', $userId)->count(),
-            'completed_backups' => Backup::where('user_id', $userId)
-                ->where('status', Backup::STATUS_COMPLETED)
-                ->count(),
-            'failed_backups' => Backup::where('user_id', $userId)
-                ->where('status', Backup::STATUS_FAILED)
-                ->count(),
-            'running_backups' => Backup::where('user_id', $userId)
-                ->where('status', Backup::STATUS_RUNNING)
-                ->count(),
-            'total_size' => Backup::where('user_id', $userId)
-                ->where('status', Backup::STATUS_COMPLETED)
-                ->sum('size_bytes'),
-            'configs_count' => BackupConfig::where('user_id', $userId)->count(),
-            'active_configs' => BackupConfig::where('user_id', $userId)
-                ->where('is_active', true)
-                ->count(),
+            'total_backups' => (int) $backupStats->total_backups,
+            'completed_backups' => (int) $backupStats->completed_backups,
+            'failed_backups' => (int) $backupStats->failed_backups,
+            'running_backups' => (int) $backupStats->running_backups,
+            'total_size' => (int) $backupStats->total_size,
+            'configs_count' => (int) $configStats->configs_count,
+            'active_configs' => (int) $configStats->active_configs,
         ];
 
         // Format total size

@@ -31,8 +31,18 @@ const UsersPage = () => import('@/pages/UsersPage.vue')
 const SettingsPage = () => import('@/pages/SettingsPage.vue')
 const ProfilePage = () => import('@/pages/ProfilePage.vue')
 const NotFoundPage = () => import('@/pages/NotFoundPage.vue')
+const SetupWizardPage = () => import('@/pages/SetupWizardPage.vue')
+const AboutPage = () => import('@/pages/AboutPage.vue')
 
 const routes = [
+  // Setup wizard (before installation)
+  {
+    path: '/setup',
+    name: 'setup',
+    component: SetupWizardPage,
+    meta: { layout: 'auth' }
+  },
+
   // Public routes
   {
     path: '/login',
@@ -217,6 +227,14 @@ const routes = [
     name: 'profile',
     component: ProfilePage,
     meta: { requiresAuth: true, title: 'nav.profile' }
+  },
+
+  // About
+  {
+    path: '/about',
+    name: 'about',
+    component: AboutPage,
+    meta: { requiresAuth: true, title: 'about.title' }
   },
 
   // 404

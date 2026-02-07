@@ -20,8 +20,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Prepend ForceJsonResponse for API routes
+        // Security headers on all responses
+        $middleware->prepend(\App\Http\Middleware\SecurityHeaders::class);
+
+        // Measure API response time
         $middleware->prependToGroup('api', [
+            \App\Http\Middleware\MeasureResponseTime::class,
             \App\Http\Middleware\ForceJsonResponse::class,
         ]);
 
