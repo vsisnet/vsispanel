@@ -14,7 +14,7 @@
 #   --help            Show this help message
 #=============================================================================
 
-set -euo pipefail
+set -eu
 
 PANEL_DIR="/opt/vsispanel"
 REPO_URL="https://github.com/vsisnet/vsispanel.git"
@@ -387,11 +387,11 @@ EOSQL
 
     # Verify DB connection before running migrations
     log_info "Testing database connection..."
-    if php artisan tinker --execute="DB::connection()->getPdo(); echo 'OK';" 2>/dev/null | grep -q "OK"; then
+    if php artisan migrate:status >> "$LOG_FILE" 2>&1; then
         log_ok "Database connection verified"
     else
         log_error "Cannot connect to database. .env values:"
-        grep "^DB_" .env
+        grep "^DB_" .env || true
         exit 1
     fi
 
