@@ -104,6 +104,15 @@ check_system() {
         log_warn "Recommended 10GB free disk. Current: ${free_disk}GB"
     fi
     log_ok "Disk: ${free_disk}GB free"
+
+    # Create swap if needed (npm requires extra memory)
+    local total_swap
+    total_swap=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
+    if [[ $total_swap -lt 1024 ]] && [[ ! -f /swapfile ]]; then
+        log_info "Creating 2GB swap file for build process..."
+        fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >> "$LOG_FILE" 2>&1 && swapon /swapfile
+        log_ok "Swap file created (2GB)"
+    fi
 }
 
 #-----------------------------------------------------------------------------
@@ -307,17 +316,28 @@ setup_application() {
     fi
 
     # Install PHP dependencies
-    log_info "Installing PHP dependencies..."
-    composer install --no-interaction --optimize-autoloader --no-dev 2>&1 | tail -3 >> "$LOG_FILE"
+    log_info "Installing PHP dependencies (this may take a few minutes)..."
+    if ! composer install --no-interaction --optimize-autoloader --no-dev >> "$LOG_FILE" 2>&1; then
+        log_error "Composer install failed. Check ${LOG_FILE} for details."
+        exit 1
+    fi
     log_ok "PHP dependencies installed"
 
     # Install Node dependencies & build
-    log_info "Installing Node.js dependencies..."
-    npm install 2>&1 | tail -3 >> "$LOG_FILE"
+    log_info "Installing Node.js dependencies (this may take a few minutes)..."
+    export NODE_OPTIONS="--max-old-space-size=512"
+    if ! npm install --no-audit --no-fund >> "$LOG_FILE" 2>&1; then
+        log_error "npm install failed. Check ${LOG_FILE} for details."
+        log_warn "If out of memory, try adding swap: fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
+        exit 1
+    fi
     log_ok "Node.js dependencies installed"
 
     log_info "Building frontend assets..."
-    npm run build 2>&1 | tail -5 >> "$LOG_FILE"
+    if ! npm run build >> "$LOG_FILE" 2>&1; then
+        log_error "Frontend build failed. Check ${LOG_FILE} for details."
+        exit 1
+    fi
     log_ok "Frontend built"
 
     # Generate app key
@@ -345,12 +365,18 @@ setup_database() {
 
     # Run migrations
     log_info "Running migrations..."
-    php artisan migrate --force 2>&1 | tail -5 >> "$LOG_FILE"
+    if ! php artisan migrate --force >> "$LOG_FILE" 2>&1; then
+        log_error "Migrations failed. Check ${LOG_FILE} for details."
+        exit 1
+    fi
     log_ok "Migrations complete"
 
     # Run seeders
     log_info "Running seeders..."
-    php artisan db:seed --force 2>&1 | tail -5 >> "$LOG_FILE"
+    if ! php artisan db:seed --force >> "$LOG_FILE" 2>&1; then
+        log_error "Seeding failed. Check ${LOG_FILE} for details."
+        exit 1
+    fi
     log_ok "Seeding complete"
 }
 
@@ -392,7 +418,7 @@ configure_system() {
     fi
 
     # Optimize
-    php artisan vsispanel:optimize 2>&1 | tail -3 >> "$LOG_FILE"
+    php artisan vsispanel:optimize >> "$LOG_FILE" 2>&1 || true
     log_ok "Application optimized"
 
     # Mark as installed
