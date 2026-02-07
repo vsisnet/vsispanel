@@ -437,18 +437,34 @@ configure_system() {
     log_ok "Directories created"
 
     # Crontab for Laravel scheduler
-    if ! crontab -l 2>/dev/null | grep -q "schedule:run"; then
-        (crontab -l 2>/dev/null; echo "* * * * * cd ${PANEL_DIR} && php artisan schedule:run >> /dev/null 2>&1") | crontab -
-        log_ok "Laravel scheduler added to crontab"
+    log_info "Setting up crontab..."
+    if command -v crontab &>/dev/null; then
+        local has_cron
+        has_cron=$(crontab -l 2>/dev/null || true)
+        if ! echo "$has_cron" | grep -q "schedule:run"; then
+            (echo "$has_cron"; echo "* * * * * cd ${PANEL_DIR} && php artisan schedule:run >> /dev/null 2>&1") | crontab - 2>/dev/null || true
+            log_ok "Laravel scheduler added to crontab"
+        else
+            log_ok "Laravel scheduler already in crontab"
+        fi
+    else
+        log_warn "crontab not found, skipping scheduler setup"
     fi
 
-    # Install systemd services
-    if [[ -f "${PANEL_DIR}/scripts/install-services.sh" ]]; then
-        bash "${PANEL_DIR}/scripts/install-services.sh" >> "$LOG_FILE" 2>&1
-        log_ok "Systemd services installed"
+    # Install supervisor configs
+    log_info "Setting up Supervisor configs..."
+    if command -v supervisord &>/dev/null && [[ -d /etc/supervisor/conf.d ]]; then
+        cp -f "${PANEL_DIR}/deploy/supervisor/vsispanel-horizon.conf" /etc/supervisor/conf.d/ 2>/dev/null || true
+        cp -f "${PANEL_DIR}/deploy/supervisor/vsispanel-reverb.conf" /etc/supervisor/conf.d/ 2>/dev/null || true
+        supervisorctl reread >> "$LOG_FILE" 2>&1 || true
+        supervisorctl update >> "$LOG_FILE" 2>&1 || true
+        log_ok "Supervisor configs installed"
+    else
+        log_warn "Supervisor not found, skipping"
     fi
 
     # Optimize
+    log_info "Optimizing application..."
     php artisan vsispanel:optimize >> "$LOG_FILE" 2>&1 || true
     log_ok "Application optimized"
 
