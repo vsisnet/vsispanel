@@ -124,10 +124,11 @@ install_dependencies() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq >> "$LOG_FILE" 2>&1
 
-    # Essential packages
+    # Essential packages (including build tools for npm native modules)
     log_info "Installing essential packages..."
     apt-get install -y -qq software-properties-common curl wget git unzip zip \
-        apt-transport-https ca-certificates lsb-release gnupg2 >> "$LOG_FILE" 2>&1
+        apt-transport-https ca-certificates lsb-release gnupg2 \
+        build-essential python3 make g++ >> "$LOG_FILE" 2>&1
     log_ok "Essential packages installed"
 }
 
