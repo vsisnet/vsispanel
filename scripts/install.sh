@@ -374,32 +374,28 @@ FLUSH PRIVILEGES;
 EOSQL
     log_ok "Database '${db_name}' and user '${db_user}' ready"
 
-    # Update .env with correct credentials
+    # Update .env with correct credentials (ensure host is 127.0.0.1 for TCP)
+    sed -i "s/^DB_HOST=.*/DB_HOST=127.0.0.1/" .env
     sed -i "s/^DB_DATABASE=.*/DB_DATABASE=${db_name}/" .env
     sed -i "s/^DB_USERNAME=.*/DB_USERNAME=${db_user}/" .env
     sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${db_pass}/" .env
     log_ok "Updated .env with database credentials"
 
-    # Clear any cached config (critical: old cache may have root user)
+    # Clear any cached config (critical: old cache may have wrong credentials)
     php artisan config:clear >> "$LOG_FILE" 2>&1 || true
     rm -f bootstrap/cache/config.php
     log_ok "Config cache cleared"
 
-    # Verify DB connection before running migrations (use mysql CLI, not artisan)
-    log_info "Testing database connection..."
-    if mysql -u"${db_user}" -p"${db_pass}" -e "SELECT 1" "${db_name}" >> "$LOG_FILE" 2>&1; then
-        log_ok "Database connection verified"
-    else
-        log_error "Cannot connect to database. .env values:"
-        grep "^DB_" .env || true
-        exit 1
-    fi
+    # Small delay to ensure MySQL privileges are fully flushed
+    sleep 1
 
-    # Run migrations
+    # Run migrations (this also validates the DB connection)
     log_info "Running migrations..."
     if ! php artisan migrate --force >> "$LOG_FILE" 2>&1; then
         log_error "Migrations failed. Last 20 lines of log:"
         tail -20 "$LOG_FILE"
+        log_warn ".env database values:"
+        grep "^DB_" .env || true
         exit 1
     fi
     log_ok "Migrations complete"
