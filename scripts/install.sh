@@ -387,25 +387,28 @@ EOSQL
 
     # Verify DB connection before running migrations
     log_info "Testing database connection..."
-    if ! php artisan db:monitor 2>&1 | tee -a "$LOG_FILE"; then
-        log_error "Cannot connect to database. Checking .env values..."
-        grep "^DB_" .env | tee -a "$LOG_FILE"
+    if php artisan tinker --execute="DB::connection()->getPdo(); echo 'OK';" 2>/dev/null | grep -q "OK"; then
+        log_ok "Database connection verified"
+    else
+        log_error "Cannot connect to database. .env values:"
+        grep "^DB_" .env
         exit 1
     fi
-    log_ok "Database connection verified"
 
-    # Run migrations (show errors directly on screen)
+    # Run migrations
     log_info "Running migrations..."
-    if ! php artisan migrate --force 2>&1 | tee -a "$LOG_FILE"; then
-        log_error "Migrations failed. See error above."
+    if ! php artisan migrate --force >> "$LOG_FILE" 2>&1; then
+        log_error "Migrations failed. Last 20 lines of log:"
+        tail -20 "$LOG_FILE"
         exit 1
     fi
     log_ok "Migrations complete"
 
     # Run seeders
     log_info "Running seeders..."
-    if ! php artisan db:seed --force 2>&1 | tee -a "$LOG_FILE"; then
-        log_error "Seeding failed. See error above."
+    if ! php artisan db:seed --force >> "$LOG_FILE" 2>&1; then
+        log_error "Seeding failed. Last 20 lines of log:"
+        tail -20 "$LOG_FILE"
         exit 1
     fi
     log_ok "Seeding complete"
