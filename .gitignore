@@ -39,4 +39,9 @@ storage/logs/*.log
 
 # Pest
 .pest
+
+# Claude / Project docs
 .claude/settings.local.json
+CLAUDE.md
+CONTEXT.md
+/docs/
