@@ -3,7 +3,9 @@
 # VSISPanel - Full Installation Script
 # Installs all dependencies and sets up VSISPanel on a fresh Ubuntu server.
 #
-# Usage: sudo bash /opt/vsispanel/scripts/install.sh [OPTIONS]
+# Usage:
+#   curl -sSL https://raw.githubusercontent.com/vsisnet/vsispanel/main/scripts/install.sh | bash
+#   OR: sudo bash /opt/vsispanel/scripts/install.sh [OPTIONS]
 #
 # Options:
 #   --skip-mail       Skip mail server (Postfix/Dovecot) installation
@@ -15,6 +17,7 @@
 set -euo pipefail
 
 PANEL_DIR="/opt/vsispanel"
+REPO_URL="https://github.com/vsisnet/vsispanel.git"
 LOG_DIR="/var/log/vsispanel"
 LOG_FILE="${LOG_DIR}/install.log"
 
@@ -69,7 +72,7 @@ parse_args() {
 # Check system requirements
 #-----------------------------------------------------------------------------
 check_system() {
-    step "1/8" "Checking system requirements"
+    step "1/9" "Checking system requirements"
 
     if [[ $EUID -ne 0 ]]; then
         log_error "This script must be run as root (use sudo)"
@@ -107,7 +110,7 @@ check_system() {
 # Install system dependencies
 #-----------------------------------------------------------------------------
 install_dependencies() {
-    step "2/8" "Installing system dependencies"
+    step "2/9" "Installing system dependencies"
 
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq >> "$LOG_FILE" 2>&1
@@ -123,7 +126,7 @@ install_dependencies() {
 # Install PHP 8.3
 #-----------------------------------------------------------------------------
 install_php() {
-    step "3/8" "Installing PHP 8.3"
+    step "3/9" "Installing PHP 8.3 + Composer + Node.js"
 
     if command -v php &>/dev/null && php -v | grep -q "8.3"; then
         log_ok "PHP 8.3 already installed"
@@ -172,7 +175,7 @@ install_nodejs() {
 # Install services (MySQL, Redis, Nginx)
 #-----------------------------------------------------------------------------
 install_services() {
-    step "4/8" "Installing services"
+    step "4/9" "Installing services"
 
     # MySQL
     if command -v mysql &>/dev/null; then
@@ -256,17 +259,51 @@ install_services() {
 }
 
 #-----------------------------------------------------------------------------
+# Clone or update VSISPanel source code
+#-----------------------------------------------------------------------------
+clone_source() {
+    step "5/9" "Downloading VSISPanel source code"
+
+    if [[ -d "${PANEL_DIR}/.git" ]]; then
+        log_ok "VSISPanel source already exists at ${PANEL_DIR}"
+        log_info "Pulling latest changes..."
+        git -C "$PANEL_DIR" pull --ff-only >> "$LOG_FILE" 2>&1 || true
+        log_ok "Source updated"
+    else
+        log_info "Cloning VSISPanel from GitHub..."
+        # Remove directory if it exists but is not a git repo (e.g. partial download)
+        if [[ -d "$PANEL_DIR" ]]; then
+            rm -rf "$PANEL_DIR"
+        fi
+        git clone "$REPO_URL" "$PANEL_DIR" >> "$LOG_FILE" 2>&1
+        log_ok "Source cloned to ${PANEL_DIR}"
+    fi
+}
+
+#-----------------------------------------------------------------------------
 # Setup VSISPanel application
 #-----------------------------------------------------------------------------
 setup_application() {
-    step "5/8" "Setting up VSISPanel application"
+    step "6/9" "Setting up VSISPanel application"
 
+    if [[ ! -d "$PANEL_DIR" ]]; then
+        log_error "VSISPanel directory not found at ${PANEL_DIR}. Clone failed?"
+        exit 1
+    fi
     cd "$PANEL_DIR"
 
     # Environment file
     if [[ ! -f .env ]]; then
-        cp .env.example .env
-        log_ok "Created .env from .env.example"
+        if [[ -f .env.example ]]; then
+            cp .env.example .env
+            log_ok "Created .env from .env.example"
+        elif [[ -f .env.production.example ]]; then
+            cp .env.production.example .env
+            log_ok "Created .env from .env.production.example"
+        else
+            log_error ".env.example not found. Is the source code complete?"
+            exit 1
+        fi
     fi
 
     # Install PHP dependencies
@@ -294,7 +331,7 @@ setup_application() {
 # Setup database
 #-----------------------------------------------------------------------------
 setup_database() {
-    step "6/8" "Setting up database"
+    step "7/9" "Setting up database"
 
     cd "$PANEL_DIR"
 
@@ -321,7 +358,7 @@ setup_database() {
 # Configure system
 #-----------------------------------------------------------------------------
 configure_system() {
-    step "7/8" "Configuring system"
+    step "8/9" "Configuring system"
 
     cd "$PANEL_DIR"
 
@@ -367,7 +404,7 @@ configure_system() {
 # Print completion
 #-----------------------------------------------------------------------------
 print_complete() {
-    step "8/8" "Installation complete"
+    step "9/9" "Installation complete"
 
     local server_ip
     server_ip=$(hostname -I | awk '{print $1}')
@@ -377,7 +414,7 @@ print_complete() {
     echo -e "${GREEN}║     VSISPanel Installation Complete!         ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  Panel URL:      ${CYAN}http://${server_ip}:8000${NC}"
+    echo -e "  Panel URL:      ${CYAN}https://${server_ip}:8443${NC}"
     echo -e "  Admin Email:    ${CYAN}admin@vsispanel.local${NC}"
     echo -e "  Admin Password: ${CYAN}(set during database seeding)${NC}"
     echo ""
@@ -416,6 +453,7 @@ main() {
     install_composer
     install_nodejs
     install_services
+    clone_source
     setup_application
     setup_database
     configure_system
