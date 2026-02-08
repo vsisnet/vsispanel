@@ -242,18 +242,20 @@ install_dependencies() {
 install_php() {
     step "3/9" "Installing PHP 8.3 + Composer + Node.js"
 
-    if command -v php &>/dev/null && php -v | grep -q "8.3"; then
-        log_ok "PHP 8.3 already installed"
-        return
+    # Add PPA if PHP 8.3 not yet available
+    if ! command -v php &>/dev/null || ! php -v | grep -q "8.3"; then
+        log_info "Adding PHP PPA..."
+        add-apt-repository -y ppa:ondrej/php >> "$LOG_FILE" 2>&1
+        apt-get update -qq >> "$LOG_FILE" 2>&1
     fi
 
-    add-apt-repository -y ppa:ondrej/php >> "$LOG_FILE" 2>&1
-    apt-get update -qq >> "$LOG_FILE" 2>&1
+    # Always ensure all required PHP extensions are installed
+    log_info "Installing PHP 8.3 and extensions..."
     apt-get install -y -qq php8.3-fpm php8.3-cli php8.3-common php8.3-mysql \
         php8.3-pgsql php8.3-sqlite3 php8.3-redis php8.3-mbstring php8.3-xml \
         php8.3-bcmath php8.3-curl php8.3-zip php8.3-gd php8.3-intl \
         php8.3-readline php8.3-soap php8.3-imap php8.3-opcache >> "$LOG_FILE" 2>&1
-    log_ok "PHP 8.3 installed: $(php -v | head -1 | awk '{print $2}')"
+    log_ok "PHP 8.3 ready: $(php -v | head -1 | awk '{print $2}')"
 }
 
 #-----------------------------------------------------------------------------
