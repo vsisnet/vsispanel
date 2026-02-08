@@ -242,19 +242,36 @@ install_dependencies() {
 install_php() {
     step "3/9" "Installing PHP 8.3 + Composer + Node.js"
 
-    # Add PPA if PHP 8.3 not yet available
-    if ! command -v php &>/dev/null || ! php -v | grep -q "8.3"; then
+    # Always add PPA and update to ensure PHP 8.3 packages are available
+    if ! apt-cache show php8.3-fpm &>/dev/null 2>&1; then
         log_info "Adding PHP PPA..."
         add-apt-repository -y ppa:ondrej/php >> "$LOG_FILE" 2>&1
-        apt-get update -qq >> "$LOG_FILE" 2>&1
     fi
+    apt-get update -qq >> "$LOG_FILE" 2>&1
+
+    # Fix any broken packages first
+    apt-get -f install -y -qq >> "$LOG_FILE" 2>&1 || true
 
     # Always ensure all required PHP extensions are installed
     log_info "Installing PHP 8.3 and extensions..."
-    apt-get install -y -qq php8.3-fpm php8.3-cli php8.3-common php8.3-mysql \
+    if ! apt-get install -y -qq php8.3-fpm php8.3-cli php8.3-common php8.3-mysql \
         php8.3-pgsql php8.3-sqlite3 php8.3-redis php8.3-mbstring php8.3-xml \
         php8.3-bcmath php8.3-curl php8.3-zip php8.3-gd php8.3-intl \
-        php8.3-readline php8.3-soap php8.3-imap php8.3-opcache >> "$LOG_FILE" 2>&1
+        php8.3-readline php8.3-soap php8.3-imap php8.3-opcache >> "$LOG_FILE" 2>&1; then
+        log_error "PHP installation failed. Trying to fix..."
+        apt-get update -qq >> "$LOG_FILE" 2>&1
+        dpkg --configure -a >> "$LOG_FILE" 2>&1 || true
+        apt-get install -y -qq php8.3-fpm php8.3-cli php8.3-common php8.3-mysql \
+            php8.3-pgsql php8.3-sqlite3 php8.3-redis php8.3-mbstring php8.3-xml \
+            php8.3-bcmath php8.3-curl php8.3-zip php8.3-gd php8.3-intl \
+            php8.3-readline php8.3-soap php8.3-imap php8.3-opcache >> "$LOG_FILE" 2>&1
+    fi
+
+    # Verify critical extensions are present
+    if ! php -m 2>/dev/null | grep -q "^dom$"; then
+        log_error "PHP ext-dom not available after install. Check ${LOG_FILE}"
+        exit 1
+    fi
     log_ok "PHP 8.3 ready: $(php -v | head -1 | awk '{print $2}')"
 }
 
@@ -470,10 +487,11 @@ setup_application() {
     sed -i 's/^APP_ENV=.*/APP_ENV=production/' .env
     sed -i 's/^APP_DEBUG=.*/APP_DEBUG=false/' .env
 
-    # Install PHP dependencies
+    # Install PHP dependencies (increase memory limit for low-RAM VPS)
     log_info "Installing PHP dependencies (this may take a few minutes)..."
-    if ! composer install --no-interaction --optimize-autoloader --no-dev >> "$LOG_FILE" 2>&1; then
-        log_error "Composer install failed. Check ${LOG_FILE} for details."
+    if ! COMPOSER_MEMORY_LIMIT=-1 composer install --no-interaction --optimize-autoloader --no-dev >> "$LOG_FILE" 2>&1; then
+        log_error "Composer install failed. Last 30 lines of log:"
+        tail -30 "$LOG_FILE"
         exit 1
     fi
     log_ok "PHP dependencies installed"
