@@ -498,7 +498,7 @@ setup_database() {
 CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
 ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+GRANT ALL PRIVILEGES ON *.* TO '${db_user}'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 EOSQL
     log_ok "Database '${db_name}' and user '${db_user}' ready"
@@ -555,7 +555,8 @@ configure_system() {
 
     cd "$PANEL_DIR"
 
-    # Permissions
+    # Permissions (www-data needs write access for logs, cache, sessions)
+    chown -R www-data:www-data storage bootstrap/cache
     chmod -R 775 storage bootstrap/cache
     log_ok "Permissions set"
 
