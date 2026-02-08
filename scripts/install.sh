@@ -67,6 +67,7 @@ do_uninstall() {
     echo "  - Drop MySQL database and user 'vsispanel'"
     echo "  - Remove /opt/vsispanel directory"
     echo "  - Remove crontab entry"
+    echo "  - Remove sudoers config"
     echo ""
     echo -e "${YELLOW}System packages (PHP, MySQL, Redis, Nginx, etc.) will NOT be removed.${NC}"
     echo ""
@@ -79,7 +80,7 @@ do_uninstall() {
     echo ""
 
     # Stop and remove panel systemd services
-    echo -e "${CYAN}[1/7]${NC} Stopping panel services..."
+    echo -e "${CYAN}[1/8]${NC} Stopping panel services..."
     for svc in vsispanel-web vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
         systemctl stop "${svc}.service" 2>/dev/null || true
         systemctl disable "${svc}.service" 2>/dev/null || true
@@ -89,7 +90,7 @@ do_uninstall() {
     echo -e "${GREEN}  ✓${NC} Panel services removed"
 
     # Remove Supervisor configs
-    echo -e "${CYAN}[2/7]${NC} Removing Supervisor configs..."
+    echo -e "${CYAN}[2/8]${NC} Removing Supervisor configs..."
     supervisorctl stop all 2>/dev/null || true
     rm -f /etc/supervisor/conf.d/vsispanel-*.conf
     supervisorctl reread 2>/dev/null || true
@@ -97,7 +98,7 @@ do_uninstall() {
     echo -e "${GREEN}  ✓${NC} Supervisor configs removed"
 
     # Remove Nginx config and SSL
-    echo -e "${CYAN}[3/7]${NC} Removing Nginx config and SSL certificate..."
+    echo -e "${CYAN}[3/8]${NC} Removing Nginx config and SSL certificate..."
     rm -f /etc/nginx/sites-enabled/vsispanel.conf
     rm -f /etc/nginx/sites-available/vsispanel.conf
     rm -rf /etc/ssl/vsispanel
@@ -109,22 +110,27 @@ do_uninstall() {
     echo -e "${GREEN}  ✓${NC} Nginx config and SSL removed"
 
     # Drop database and user
-    echo -e "${CYAN}[4/7]${NC} Dropping database and user..."
+    echo -e "${CYAN}[4/8]${NC} Dropping database and user..."
     mysql -e "DROP DATABASE IF EXISTS vsispanel; DROP USER IF EXISTS 'vsispanel'@'localhost'; FLUSH PRIVILEGES;" 2>/dev/null || true
     echo -e "${GREEN}  ✓${NC} Database 'vsispanel' dropped"
 
     # Remove crontab entry
-    echo -e "${CYAN}[5/7]${NC} Removing crontab entry..."
+    echo -e "${CYAN}[5/8]${NC} Removing crontab entry..."
     crontab -l 2>/dev/null | grep -v "schedule:run" | crontab - 2>/dev/null || true
     echo -e "${GREEN}  ✓${NC} Crontab entry removed"
 
     # Remove rclone config
-    echo -e "${CYAN}[6/7]${NC} Removing backup configs..."
+    echo -e "${CYAN}[6/8]${NC} Removing backup configs..."
     rm -rf /etc/rclone /var/backups/vsispanel
     echo -e "${GREEN}  ✓${NC} Backup configs removed"
 
+    # Remove sudoers
+    echo -e "${CYAN}[7/8]${NC} Removing sudoers config..."
+    rm -f /etc/sudoers.d/vsispanel
+    echo -e "${GREEN}  ✓${NC} Sudoers config removed"
+
     # Remove source code
-    echo -e "${CYAN}[7/7]${NC} Removing /opt/vsispanel..."
+    echo -e "${CYAN}[8/8]${NC} Removing /opt/vsispanel..."
     rm -rf /opt/vsispanel
     echo -e "${GREEN}  ✓${NC} Source code removed"
 
@@ -226,7 +232,7 @@ install_dependencies() {
     log_info "Installing essential packages..."
     apt-get install -y -qq software-properties-common curl wget git unzip zip \
         apt-transport-https ca-certificates lsb-release gnupg2 \
-        build-essential python3 make g++ >> "$LOG_FILE" 2>&1
+        build-essential python3 make g++ acl >> "$LOG_FILE" 2>&1
     log_ok "Essential packages installed"
 }
 
@@ -280,7 +286,7 @@ install_nodejs() {
 }
 
 #-----------------------------------------------------------------------------
-# Install services (MySQL, Redis, Nginx)
+# Install services (MySQL, Redis, Nginx, etc.)
 #-----------------------------------------------------------------------------
 install_services() {
     step "4/9" "Installing services"
@@ -316,6 +322,19 @@ install_services() {
         systemctl enable nginx >> "$LOG_FILE" 2>&1
         systemctl start nginx
         log_ok "Nginx installed"
+    fi
+
+    # phpMyAdmin
+    if [[ -d /usr/share/phpmyadmin ]]; then
+        log_ok "phpMyAdmin already installed"
+    else
+        log_info "Installing phpMyAdmin..."
+        export DEBIAN_FRONTEND=noninteractive
+        # Pre-configure phpmyadmin to avoid interactive prompts
+        echo "phpmyadmin phpmyadmin/dbconfig-install boolean false" | debconf-set-selections 2>/dev/null || true
+        echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect none" | debconf-set-selections 2>/dev/null || true
+        apt-get install -y -qq phpmyadmin >> "$LOG_FILE" 2>&1 || true
+        log_ok "phpMyAdmin installed"
     fi
 
     # Optional: Mail server
@@ -388,7 +407,7 @@ install_services() {
         log_ok "Rclone installed"
     fi
 
-    # Supervisor for queue workers
+    # Supervisor (for compatibility, not used for panel services)
     if ! command -v supervisord &>/dev/null; then
         log_info "Installing Supervisor..."
         apt-get install -y -qq supervisor >> "$LOG_FILE" 2>&1
@@ -444,6 +463,10 @@ setup_application() {
             exit 1
         fi
     fi
+
+    # Set production environment
+    sed -i 's/^APP_ENV=.*/APP_ENV=production/' .env
+    sed -i 's/^APP_DEBUG=.*/APP_DEBUG=false/' .env
 
     # Install PHP dependencies
     log_info "Installing PHP dependencies (this may take a few minutes)..."
@@ -534,7 +557,7 @@ EOSQL
     sed -i '/^ADMIN_PASSWORD=/d' .env
     echo "ADMIN_PASSWORD=${ADMIN_PASS}" >> .env
 
-    # Run seeders
+    # Run seeders (includes roles, admin, plans, alert templates, app templates)
     log_info "Running seeders..."
     if ! php artisan db:seed --force >> "$LOG_FILE" 2>&1; then
         log_error "Seeding failed. Last 20 lines of log:"
@@ -554,6 +577,17 @@ configure_system() {
     step "8/9" "Configuring system"
 
     cd "$PANEL_DIR"
+
+    # Setup sudoers for www-data (PHP-FPM needs system access for hosting management)
+    log_info "Configuring sudoers for panel..."
+    cat > /etc/sudoers.d/vsispanel << 'SUDOEOF'
+# VSISPanel sudo permissions
+# Hosting panel requires system access for service/user/file management
+# Security is enforced by the application's allowed_commands whitelist and RBAC
+www-data ALL=(ALL) NOPASSWD: ALL
+SUDOEOF
+    chmod 440 /etc/sudoers.d/vsispanel
+    log_ok "Sudoers configured for www-data"
 
     # Permissions (www-data needs write access for logs, cache, sessions)
     chown -R www-data:www-data storage bootstrap/cache
@@ -645,14 +679,14 @@ MYSQLEOF
         log_ok "SSL certificate already exists"
     fi
 
-    # Configure Nginx for panel
+    # Configure Nginx for panel (includes phpMyAdmin)
     log_info "Configuring Nginx for panel (port 8443)..."
     cp -f "${PANEL_DIR}/deploy/nginx/vsispanel.conf" /etc/nginx/sites-available/vsispanel.conf
     ln -sf /etc/nginx/sites-available/vsispanel.conf /etc/nginx/sites-enabled/vsispanel.conf
     rm -f /etc/nginx/sites-enabled/default
     nginx -t >> "$LOG_FILE" 2>&1
     systemctl reload nginx
-    log_ok "Nginx configured on port 8443 (SSL)"
+    log_ok "Nginx configured on port 8443 (SSL + phpMyAdmin)"
 
     # Tune PHP-FPM for low memory
     local fpm_pool="/etc/php/8.3/fpm/pool.d/www.conf"
@@ -670,31 +704,9 @@ MYSQLEOF
     systemctl restart php8.3-fpm
     log_ok "PHP-FPM started"
 
-    # Install VSISPanel systemd services
+    # Install VSISPanel systemd services (Horizon, Reverb, Terminal)
+    # Note: Web is handled by Nginx + PHP-FPM, no separate web service needed
     log_info "Installing panel systemd services..."
-
-    # vsispanel-web (Laravel dev server — registered for AppManager, Nginx handles production)
-    cat > /etc/systemd/system/vsispanel-web.service <<'SVCEOF'
-[Unit]
-Description=VSISPanel Web Server (Laravel)
-After=network.target mysql.service redis-server.service
-Wants=mysql.service redis-server.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/vsispanel
-ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=8000
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=vsispanel-web
-Environment=APP_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
 
     # vsispanel-horizon (Queue worker — required)
     cat > /etc/systemd/system/vsispanel-horizon.service <<'SVCEOF'
@@ -765,12 +777,18 @@ Environment=REDIS_URL=redis://127.0.0.1:6379
 WantedBy=multi-user.target
 SVCEOF
 
+    # Remove old vsispanel-web service if exists (Nginx+PHP-FPM handles web)
+    if [[ -f /etc/systemd/system/vsispanel-web.service ]]; then
+        systemctl stop vsispanel-web 2>/dev/null || true
+        systemctl disable vsispanel-web 2>/dev/null || true
+        rm -f /etc/systemd/system/vsispanel-web.service
+        log_ok "Removed redundant vsispanel-web service (Nginx handles web)"
+    fi
+
     systemctl daemon-reload
     log_ok "Panel systemd service files installed"
 
-    # Enable and start panel services (skip vsispanel-web — Nginx+PHP-FPM handles web)
-    # vsispanel-web unit file is installed for AppManager detection but NOT started
-    systemctl enable vsispanel-web.service >> "$LOG_FILE" 2>&1 || true
+    # Enable and start panel services
     for svc in vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
         systemctl enable "${svc}.service" >> "$LOG_FILE" 2>&1 || true
         systemctl start "${svc}.service" >> "$LOG_FILE" 2>&1 || true
@@ -789,10 +807,12 @@ SVCEOF
         fi
     fi
 
-    # Open firewall port if UFW is active
+    # Open firewall ports if UFW is active
     if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
         ufw allow 8443/tcp >> "$LOG_FILE" 2>&1 || true
-        log_ok "Firewall port 8443 opened"
+        ufw allow 80/tcp >> "$LOG_FILE" 2>&1 || true
+        ufw allow 443/tcp >> "$LOG_FILE" 2>&1 || true
+        log_ok "Firewall ports opened (80, 443, 8443)"
     fi
 
     # Optimize
@@ -820,6 +840,7 @@ print_complete() {
     echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  Panel URL:      ${CYAN}https://${server_ip}:8443${NC}"
+    echo -e "  phpMyAdmin:     ${CYAN}https://${server_ip}:8443/phpmyadmin${NC}"
     echo -e "  Admin Email:    ${CYAN}admin@vsispanel.local${NC}"
     echo -e "  Admin Password: ${CYAN}${ADMIN_PASS}${NC}"
     echo ""
@@ -827,9 +848,12 @@ print_complete() {
     echo -e "  ${YELLOW}⚠  The SSL certificate is self-signed. Your browser will show a warning.${NC}"
     echo ""
     echo -e "  ${BOLD}Manage Services:${NC}"
-    echo -e "    systemctl status nginx"
-    echo -e "    systemctl status php8.3-fpm"
-    echo -e "    supervisorctl status"
+    echo -e "    systemctl status vsispanel-horizon"
+    echo -e "    systemctl status vsispanel-reverb"
+    echo -e "    systemctl status vsispanel-terminal"
+    echo ""
+    echo -e "  ${BOLD}Update Panel:${NC}"
+    echo -e "    cd ${PANEL_DIR} && php artisan vsispanel:update"
     echo ""
     echo -e "  Log file: ${YELLOW}${LOG_FILE}${NC}"
     echo ""

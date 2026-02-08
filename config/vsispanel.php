@@ -100,6 +100,7 @@ return [
         'unzip',
         'restic',
         'borg',
+        'rclone',
 
         // Shell/Utilities (for piping commands)
         'bash',
