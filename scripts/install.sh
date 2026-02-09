@@ -655,20 +655,40 @@ REVERBEOF
     fi
     log_ok "PHP dependencies installed"
 
+    # Ensure sufficient memory for Node.js build (create swap if needed)
+    local total_mem_mb
+    total_mem_mb=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo)
+    local swap_mb
+    swap_mb=$(awk '/SwapTotal/ {printf "%d", $2/1024}' /proc/meminfo)
+    if [[ $((total_mem_mb + swap_mb)) -lt 2048 ]]; then
+        if [[ ! -f /swapfile ]]; then
+            log_info "Low memory detected (${total_mem_mb}MB RAM + ${swap_mb}MB swap). Creating 2GB swap..."
+            fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 >> "$LOG_FILE" 2>&1
+            chmod 600 /swapfile
+            mkswap /swapfile >> "$LOG_FILE" 2>&1
+            swapon /swapfile >> "$LOG_FILE" 2>&1
+            log_ok "Swap created and enabled (2GB)"
+        fi
+    fi
+
     # Install Node dependencies & build
     log_info "Installing Node.js dependencies (this may take a few minutes)..."
-    export NODE_OPTIONS="--max-old-space-size=512"
+    export NODE_OPTIONS="--max-old-space-size=1536"
     if ! npm install --no-audit --no-fund >> "$LOG_FILE" 2>&1; then
         log_error "npm install failed. Check ${LOG_FILE} for details."
-        log_warn "If out of memory, try adding swap: fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
         exit 1
     fi
     log_ok "Node.js dependencies installed"
 
-    log_info "Building frontend assets..."
+    log_info "Building frontend assets (this may take a few minutes)..."
     if ! npm run build >> "$LOG_FILE" 2>&1; then
-        log_error "Frontend build failed. Check ${LOG_FILE} for details."
-        exit 1
+        # Retry with higher memory limit
+        log_warn "Build failed, retrying with higher memory limit..."
+        export NODE_OPTIONS="--max-old-space-size=3072"
+        if ! npm run build >> "$LOG_FILE" 2>&1; then
+            log_error "Frontend build failed. Check ${LOG_FILE} for details."
+            exit 1
+        fi
     fi
     log_ok "Frontend built"
 
