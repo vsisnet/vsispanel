@@ -115,63 +115,78 @@ class OAuthController extends Controller
      */
     public function callback(Request $request, string $provider): RedirectResponse
     {
-        $state = $request->input('state');
-        $encryptedTokens = $request->input('tokens');
-        $error = $request->input('error');
+        try {
+            $state = $request->input('state');
+            $encryptedTokens = $request->input('tokens');
+            $error = $request->input('error');
 
-        // Check for OAuth error
-        if ($error) {
-            $errorDesc = $request->input('error_description', $error);
-            Log::error('OAuth error', ['provider' => $provider, 'error' => $error, 'description' => $errorDesc]);
-            return redirect('/backup?tab=remotes&oauth_error=' . urlencode($error));
+            // Check for OAuth error
+            if ($error) {
+                $errorDesc = $request->input('error_description', $error);
+                Log::error('OAuth error', ['provider' => $provider, 'error' => $error, 'description' => $errorDesc]);
+                return redirect('/backup?tab=remotes&oauth_error=' . urlencode($error));
+            }
+
+            // Validate state
+            $stateData = Cache::get("oauth_state_{$state}");
+
+            if (!$stateData) {
+                Log::error('Invalid OAuth state', ['state' => $state]);
+                return redirect('/backup?tab=remotes&oauth_error=invalid_state');
+            }
+
+            // Clear state from cache
+            Cache::forget("oauth_state_{$state}");
+
+            // Check if we received encrypted tokens
+            if (empty($encryptedTokens)) {
+                Log::error('No tokens received from OAuth Proxy');
+                return redirect('/backup?tab=remotes&oauth_error=no_tokens');
+            }
+
+            // Decrypt tokens via OAuth Proxy API
+            $tokens = $this->decryptTokensFromProxy($encryptedTokens, $provider);
+
+            if (!$tokens) {
+                return redirect('/backup?tab=remotes&oauth_error=token_decrypt_failed');
+            }
+
+            // Create storage remote with OAuth tokens
+            $result = $this->createOAuthRemoteFromProxy(
+                $stateData['remote_name'],
+                $stateData['display_name'],
+                $provider,
+                $tokens
+            );
+
+            if (!$result['success']) {
+                return redirect('/backup?tab=remotes&oauth_error=' . urlencode($result['error']));
+            }
+
+            // Log the action
+            try {
+                $this->auditService->log(
+                    AuditLog::ACTION_CREATE,
+                    'backup',
+                    'storage_remote',
+                    $result['remote_id'],
+                    "Created OAuth storage remote: {$stateData['display_name']}"
+                );
+            } catch (\Exception $e) {
+                Log::warning('Failed to log OAuth audit', ['error' => $e->getMessage()]);
+            }
+
+            return redirect('/backup?tab=remotes&oauth_success=true&remote_id=' . $result['remote_id']);
+        } catch (\Exception $e) {
+            Log::error('OAuth callback exception', [
+                'provider' => $provider,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return redirect('/backup?tab=remotes&oauth_error=' . urlencode($e->getMessage()));
         }
-
-        // Validate state
-        $stateData = Cache::get("oauth_state_{$state}");
-
-        if (!$stateData) {
-            Log::error('Invalid OAuth state', ['state' => $state]);
-            return redirect('/backup?tab=remotes&oauth_error=invalid_state');
-        }
-
-        // Clear state from cache
-        Cache::forget("oauth_state_{$state}");
-
-        // Check if we received encrypted tokens
-        if (empty($encryptedTokens)) {
-            Log::error('No tokens received from OAuth Proxy');
-            return redirect('/backup?tab=remotes&oauth_error=no_tokens');
-        }
-
-        // Decrypt tokens via OAuth Proxy API
-        $tokens = $this->decryptTokensFromProxy($encryptedTokens, $provider);
-
-        if (!$tokens) {
-            return redirect('/backup?tab=remotes&oauth_error=token_decrypt_failed');
-        }
-
-        // Create storage remote with OAuth tokens
-        $result = $this->createOAuthRemoteFromProxy(
-            $stateData['remote_name'],
-            $stateData['display_name'],
-            $provider,
-            $tokens
-        );
-
-        if (!$result['success']) {
-            return redirect('/backup?tab=remotes&oauth_error=' . urlencode($result['error']));
-        }
-
-        // Log the action
-        $this->auditService->log(
-            AuditLog::ACTION_CREATE,
-            'backup',
-            'storage_remote',
-            $result['remote_id'],
-            "Created OAuth storage remote: {$stateData['display_name']}"
-        );
-
-        return redirect('/backup?tab=remotes&oauth_success=true&remote_id=' . $result['remote_id']);
     }
 
     /**
