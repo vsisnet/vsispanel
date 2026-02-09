@@ -1980,7 +1980,15 @@
     "description": "Configure your panel and server settings",
     "tabs": {
       "general": "General",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "ssl": "SSL"
+    },
+    "ssl": {
+      "title": "Let's Encrypt Configuration",
+      "description": "Configure the email address used for Let's Encrypt SSL certificate registration and expiry notifications.",
+      "letsencryptEmail": "Let's Encrypt Email",
+      "letsencryptEmailPlaceholder": "admin@example.com",
+      "letsencryptEmailHint": "A valid email is required by Let's Encrypt for certificate registration and expiry alerts."
     },
     "serverTime": "Server Time",
     "currentTime": "Current Time",

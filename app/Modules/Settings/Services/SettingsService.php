@@ -509,6 +509,9 @@ class SettingsService
                 'discord.enabled' => ['type' => 'boolean', 'default' => false],
                 'discord.webhook_url' => ['type' => 'string', 'default' => ''],
             ],
+            'ssl' => [
+                'letsencrypt_email' => ['type' => 'string', 'default' => ''],
+            ],
         ];
     }
 }

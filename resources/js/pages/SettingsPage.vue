@@ -55,21 +55,24 @@ import api from '@/utils/api'
 import VLoadingSkeleton from '@/components/ui/VLoadingSkeleton.vue'
 import SettingsGeneralTab from '@/components/settings/SettingsGeneralTab.vue'
 import SettingsNotificationsTab from '@/components/settings/SettingsNotificationsTab.vue'
-import { Cog6ToothIcon, BellIcon } from '@heroicons/vue/24/outline'
+import SettingsSslTab from '@/components/settings/SettingsSslTab.vue'
+import { Cog6ToothIcon, BellIcon, LockClosedIcon } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
 const router = useRouter()
 
-const validTabs = ['general', 'notifications']
+const validTabs = ['general', 'notifications', 'ssl']
 
 const tabs = [
   { id: 'general', icon: markRaw(Cog6ToothIcon) },
   { id: 'notifications', icon: markRaw(BellIcon) },
+  { id: 'ssl', icon: markRaw(LockClosedIcon) },
 ]
 
 const tabComponents = {
   general: markRaw(SettingsGeneralTab),
   notifications: markRaw(SettingsNotificationsTab),
+  ssl: markRaw(SettingsSslTab),
 }
 
 // State

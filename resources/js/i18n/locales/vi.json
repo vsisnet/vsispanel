@@ -1964,7 +1964,15 @@
     "description": "Cấu hình cài đặt panel và máy chủ",
     "tabs": {
       "general": "Chung",
-      "notifications": "Thông báo"
+      "notifications": "Thông báo",
+      "ssl": "SSL"
+    },
+    "ssl": {
+      "title": "Cấu hình Let's Encrypt",
+      "description": "Cấu hình địa chỉ email dùng cho đăng ký chứng chỉ SSL Let's Encrypt và thông báo hết hạn.",
+      "letsencryptEmail": "Email Let's Encrypt",
+      "letsencryptEmailPlaceholder": "admin@example.com",
+      "letsencryptEmailHint": "Let's Encrypt yêu cầu email hợp lệ để đăng ký chứng chỉ và gửi cảnh báo hết hạn."
     },
     "serverTime": "Thời gian máy chủ",
     "currentTime": "Thời gian hiện tại",

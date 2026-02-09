@@ -1075,6 +1075,7 @@ print_complete() {
     echo ""
     echo -e "  ${YELLOW}⚠  Please change the default password after first login!${NC}"
     echo -e "  ${YELLOW}⚠  The SSL certificate is self-signed. Your browser will show a warning.${NC}"
+    echo -e "  ${YELLOW}⚠  Set your email in Settings > SSL before issuing Let's Encrypt certificates.${NC}"
     echo ""
     echo -e "  ${BOLD}Manage Services:${NC}"
     echo -e "    systemctl status vsispanel-horizon"

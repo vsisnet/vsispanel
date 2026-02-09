@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\SSL\Services;
 
 use App\Modules\Domain\Models\Domain;
+use App\Modules\Settings\Models\SystemSetting;
 use App\Modules\SSL\Models\SslCertificate;
 use App\Modules\WebServer\Services\NginxService;
 use App\Services\SystemCommandExecutor;
@@ -48,7 +49,13 @@ class SslService
                 throw new RuntimeException("No valid DNS records found for domain: {$domain->name}");
             }
 
-            $email = config('vsispanel.ssl.letsencrypt_email', 'admin@' . $domain->name);
+            $email = $this->getLetsEncryptEmail();
+
+            if (empty($email)) {
+                throw new RuntimeException(
+                    "Let's Encrypt email not configured. Please set it in Settings > SSL before issuing certificates."
+                );
+            }
 
             // Build certbot arguments
             $certbotArgs = [
@@ -108,6 +115,27 @@ class SslService
             $certificate->markAsFailed($e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Get the email address for Let's Encrypt registration.
+     * Priority: Settings DB → env/config → empty
+     */
+    protected function getLetsEncryptEmail(): string
+    {
+        // 1. Check Settings DB
+        $setting = SystemSetting::where('group', 'ssl')
+            ->where('key', 'letsencrypt_email')
+            ->first();
+
+        if ($setting && !empty($setting->value)) {
+            return $setting->value;
+        }
+
+        // 2. Fall back to env/config
+        $configEmail = config('vsispanel.ssl.letsencrypt_email', '');
+
+        return $configEmail ?: '';
     }
 
     /**

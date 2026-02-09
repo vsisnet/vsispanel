@@ -54,6 +54,9 @@ class UpdateSettingsRequest extends FormRequest
             'notifications.slack.webhook_url' => ['sometimes', 'nullable', 'url:http,https', 'max:500'],
             'notifications.discord.enabled' => ['sometimes', 'boolean'],
             'notifications.discord.webhook_url' => ['sometimes', 'nullable', 'url:http,https', 'max:500'],
+
+            // SSL settings
+            'ssl.letsencrypt_email' => ['sometimes', 'nullable', 'email', 'max:255'],
         ];
     }
 }
