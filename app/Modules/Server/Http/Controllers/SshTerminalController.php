@@ -42,14 +42,16 @@ class SshTerminalController extends Controller
             'username' => $username,
         ]));
 
-        $wsPort = config('terminal.port', 8022);
         $wsHost = $request->getHost();
+        $wsScheme = $request->isSecure() ? 'wss' : 'ws';
+        $wsPort = $request->isSecure() ? (int) ($request->getPort() ?: 8443) : (int) config('terminal.port', 8022);
+        $wsPath = $request->isSecure() ? '/ws/terminal' : '';
 
         return response()->json([
             'success' => true,
             'data' => [
                 'token' => $token,
-                'ws_url' => "ws://{$wsHost}:{$wsPort}",
+                'ws_url' => "{$wsScheme}://{$wsHost}:{$wsPort}{$wsPath}",
             ],
         ]);
     }

@@ -304,7 +304,7 @@ class AppManagerService
     {
         $service = $this->resolveServiceName($app, $version);
 
-        $result = Process::timeout(30)->run("systemctl start " . escapeshellarg($service));
+        $result = Process::timeout(30)->run("sudo systemctl start " . escapeshellarg($service));
 
         if ($result->successful()) {
             $this->refreshStatus($app);
@@ -322,7 +322,7 @@ class AppManagerService
     {
         $service = $this->resolveServiceName($app, $version);
 
-        $result = Process::timeout(30)->run("systemctl stop " . escapeshellarg($service));
+        $result = Process::timeout(30)->run("sudo systemctl stop " . escapeshellarg($service));
 
         if ($result->successful()) {
             $this->refreshStatus($app);
@@ -340,7 +340,7 @@ class AppManagerService
     {
         $service = $this->resolveServiceName($app, $version);
 
-        $result = Process::timeout(30)->run("systemctl restart " . escapeshellarg($service));
+        $result = Process::timeout(30)->run("sudo systemctl restart " . escapeshellarg($service));
 
         if ($result->successful()) {
             $this->refreshStatus($app);
@@ -357,7 +357,7 @@ class AppManagerService
     public function enableApp(ManagedApp $app, ?string $version = null): array
     {
         $service = $this->resolveServiceName($app, $version);
-        $result = Process::timeout(15)->run("systemctl enable " . escapeshellarg($service));
+        $result = Process::timeout(15)->run("sudo systemctl enable " . escapeshellarg($service));
 
         $this->refreshStatus($app);
 
@@ -370,7 +370,7 @@ class AppManagerService
     public function disableApp(ManagedApp $app, ?string $version = null): array
     {
         $service = $this->resolveServiceName($app, $version);
-        $result = Process::timeout(15)->run("systemctl disable " . escapeshellarg($service));
+        $result = Process::timeout(15)->run("sudo systemctl disable " . escapeshellarg($service));
 
         $this->refreshStatus($app);
 
@@ -391,20 +391,20 @@ class AppManagerService
         }
 
         if ($app->slug === 'php') {
-            Process::timeout(15)->run("update-alternatives --set php /usr/bin/php{$version} 2>/dev/null");
+            Process::timeout(15)->run("sudo update-alternatives --set php /usr/bin/php{$version} 2>/dev/null");
         }
 
         if ($app->slug === 'nodejs') {
             $config = config("appmanager.apps.nodejs", []);
             $installDir = $config['install_dir'] ?? '/usr/local/lib/nodejs';
             $binDir = "{$installDir}/node-{$version}/bin";
-            Process::timeout(5)->run("ln -sf {$binDir}/node /usr/local/bin/node");
-            Process::timeout(5)->run("ln -sf {$binDir}/npm /usr/local/bin/npm");
-            Process::timeout(5)->run("ln -sf {$binDir}/npx /usr/local/bin/npx");
+            Process::timeout(5)->run("sudo ln -sf {$binDir}/node /usr/local/bin/node");
+            Process::timeout(5)->run("sudo ln -sf {$binDir}/npm /usr/local/bin/npm");
+            Process::timeout(5)->run("sudo ln -sf {$binDir}/npx /usr/local/bin/npx");
         }
 
         if ($app->slug === 'python') {
-            Process::timeout(5)->run("update-alternatives --install /usr/bin/python3 python3 /usr/bin/python{$version} 1 2>/dev/null");
+            Process::timeout(5)->run("sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python{$version} 1 2>/dev/null");
         }
 
         $app->update(['active_version' => $version]);
@@ -618,14 +618,14 @@ class AppManagerService
     private function validateConfig(ManagedApp $app, string $key): ?array
     {
         if ($app->slug === 'nginx') {
-            $result = Process::timeout(10)->run('nginx -t 2>&1');
+            $result = Process::timeout(10)->run('sudo nginx -t 2>&1');
 
             return ['valid' => $result->successful(), 'error' => $result->errorOutput()];
         }
 
         if ($app->slug === 'php' && $key === 'fpm') {
             $version = $app->active_version ?? '8.3';
-            $result = Process::timeout(10)->run("php-fpm{$version} -t 2>&1");
+            $result = Process::timeout(10)->run("sudo php-fpm{$version} -t 2>&1");
 
             return ['valid' => $result->successful(), 'error' => $result->errorOutput()];
         }

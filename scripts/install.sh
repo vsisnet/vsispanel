@@ -687,7 +687,8 @@ SUDOEOF
     mkdir -p /etc/rclone /var/backups/vsispanel "$LOG_DIR"
     chmod 700 /etc/rclone /var/backups/vsispanel
     touch /etc/rclone/rclone.conf
-    chmod 600 /etc/rclone/rclone.conf
+    chown root:www-data /etc/rclone/rclone.conf
+    chmod 660 /etc/rclone/rclone.conf
     log_ok "Directories created"
 
     # Tune MySQL for low memory VPS (< 4GB RAM)

@@ -21,10 +21,30 @@ class RcloneService
 
     /**
      * Build rclone command with config flag
+     * Uses sudo to ensure access to the config file regardless of the running user
      */
     protected function rclone(string $subCommand): string
     {
-        return "rclone {$this->getConfigFlag()} {$subCommand}";
+        return "sudo rclone {$this->getConfigFlag()} {$subCommand}";
+    }
+
+    /**
+     * Fix rclone config file permissions
+     * Sets 660 root:www-data so both root (Horizon/CLI) and www-data (PHP-FPM) can read/write
+     */
+    protected function fixConfigPermissions(): void
+    {
+        try {
+            if (file_exists($this->configPath)) {
+                chmod($this->configPath, 0660);
+                // Set group to www-data if running as root
+                if (posix_getuid() === 0) {
+                    chgrp($this->configPath, 'www-data');
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to fix rclone config permissions', ['error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -57,8 +77,10 @@ class RcloneService
         // Create empty config file if it doesn't exist
         if (!file_exists($this->configPath)) {
             file_put_contents($this->configPath, '');
-            chmod($this->configPath, 0600);
         }
+
+        // Ensure proper permissions (readable/writable by www-data for PHP-FPM)
+        $this->fixConfigPermissions();
 
         Log::info('Rclone installed successfully');
 
@@ -208,8 +230,8 @@ class RcloneService
             // Append to config file
             file_put_contents($this->configPath, $configContent . $section);
 
-            // Set proper permissions
-            chmod($this->configPath, 0600);
+            // Ensure proper permissions
+            $this->fixConfigPermissions();
 
             Log::info('Rclone OAuth remote created', ['name' => $name, 'type' => $type]);
 
@@ -352,7 +374,7 @@ class RcloneService
 
             // Write back to config file
             file_put_contents($this->configPath, implode("\n", $newLines));
-            chmod($this->configPath, 0600);
+            $this->fixConfigPermissions();
 
             Log::info('Rclone remote config updated via file edit', ['name' => $name, 'updates' => array_keys($updates)]);
 
