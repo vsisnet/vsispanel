@@ -1989,12 +1989,46 @@ const initiateOAuth = async () => {
   }
 }
 
+// Listen for OAuth result from popup window
+const handleOAuthMessage = (event) => {
+  if (event.origin !== window.location.origin) return
+  if (event.data?.type !== 'oauth_callback') return
+
+  if (event.data.success) {
+    showToast(t('backup.oauthSuccess'), 'success')
+    fetchStorageRemotes()
+    activeTab.value = 'remotes'
+  } else if (event.data.error) {
+    const errorMessages = {
+      invalid_state: t('backup.oauthErrorInvalidState'),
+      token_exchange_failed: t('backup.oauthErrorTokenExchange'),
+      token_decrypt_failed: t('backup.oauthErrorTokenExchange'),
+      user_denied: t('backup.oauthErrorUserDenied')
+    }
+    showToast(errorMessages[event.data.error] || event.data.error, 'error')
+  }
+
+  oauthWindow.value = null
+}
+
 // Handle OAuth callback from URL parameters
 const handleOAuthCallback = () => {
   const oauthSuccess = route.query.oauth_success
   const oauthError = route.query.oauth_error
   const remoteId = route.query.remote_id
   const tab = route.query.tab
+
+  // If we're inside the OAuth popup window, notify parent and close
+  if ((oauthSuccess || oauthError) && window.opener && !window.opener.closed) {
+    window.opener.postMessage({
+      type: 'oauth_callback',
+      success: oauthSuccess === 'true',
+      error: oauthError || null,
+      remoteId: remoteId || null
+    }, window.location.origin)
+    window.close()
+    return
+  }
 
   // Set active tab if specified
   if (tab) {
@@ -2010,6 +2044,7 @@ const handleOAuthCallback = () => {
     const errorMessages = {
       invalid_state: t('backup.oauthErrorInvalidState'),
       token_exchange_failed: t('backup.oauthErrorTokenExchange'),
+      token_decrypt_failed: t('backup.oauthErrorTokenExchange'),
       user_denied: t('backup.oauthErrorUserDenied')
     }
     showToast(errorMessages[oauthError] || oauthError, 'error')
@@ -2033,11 +2068,15 @@ onMounted(() => {
     }
   })
 
-  // Handle OAuth callback if present
+  // Listen for OAuth popup messages
+  window.addEventListener('message', handleOAuthMessage)
+
+  // Handle OAuth callback if present (for popup or direct navigation)
   handleOAuthCallback()
 })
 
 onUnmounted(() => {
   stopTaskPolling()
+  window.removeEventListener('message', handleOAuthMessage)
 })
 </script>
