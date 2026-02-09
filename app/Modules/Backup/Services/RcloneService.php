@@ -76,11 +76,8 @@ class RcloneService
 
         // Create empty config file if it doesn't exist
         if (!file_exists($this->configPath)) {
-            file_put_contents($this->configPath, '');
+            $this->writeConfigFile('');
         }
-
-        // Ensure proper permissions (readable/writable by www-data for PHP-FPM)
-        $this->fixConfigPermissions();
 
         Log::info('Rclone installed successfully');
 
@@ -200,14 +197,8 @@ class RcloneService
     protected function createOAuthRemote(string $name, string $type, array $config): array
     {
         try {
-            // Ensure config directory exists
-            $configDir = dirname($this->configPath);
-            if (!is_dir($configDir)) {
-                mkdir($configDir, 0755, true);
-            }
-
             // Read existing config
-            $configContent = file_exists($this->configPath) ? file_get_contents($this->configPath) : '';
+            $configContent = $this->readConfigFile();
 
             // Check if remote already exists
             if (preg_match('/^\[' . preg_quote($name, '/') . '\]/m', $configContent)) {
@@ -228,10 +219,7 @@ class RcloneService
             }
 
             // Append to config file
-            file_put_contents($this->configPath, $configContent . $section);
-
-            // Ensure proper permissions
-            $this->fixConfigPermissions();
+            $this->writeConfigFile($configContent . $section);
 
             Log::info('Rclone OAuth remote created', ['name' => $name, 'type' => $type]);
 
@@ -306,7 +294,7 @@ class RcloneService
                 ];
             }
 
-            $configContent = file_get_contents($this->configPath);
+            $configContent = $this->readConfigFile();
             $lines = explode("\n", $configContent);
             $newLines = [];
             $inSection = false;
@@ -373,8 +361,7 @@ class RcloneService
             }
 
             // Write back to config file
-            file_put_contents($this->configPath, implode("\n", $newLines));
-            $this->fixConfigPermissions();
+            $this->writeConfigFile(implode("\n", $newLines));
 
             Log::info('Rclone remote config updated via file edit', ['name' => $name, 'updates' => array_keys($updates)]);
 
@@ -1068,6 +1055,40 @@ class RcloneService
         }
 
         return $params;
+    }
+
+    /**
+     * Read rclone config file content using sudo
+     */
+    protected function readConfigFile(): string
+    {
+        if (!file_exists($this->configPath)) {
+            return '';
+        }
+
+        $result = Process::timeout(5)->run('sudo cat ' . escapeshellarg($this->configPath));
+        return $result->successful() ? $result->output() : '';
+    }
+
+    /**
+     * Write content to rclone config file using sudo
+     */
+    protected function writeConfigFile(string $content): bool
+    {
+        $dir = dirname($this->configPath);
+        Process::timeout(5)->run("sudo mkdir -p " . escapeshellarg($dir));
+
+        $result = Process::timeout(10)->run(
+            'sudo tee ' . escapeshellarg($this->configPath),
+            $content
+        );
+
+        if ($result->successful()) {
+            $this->fixConfigPermissions();
+            return true;
+        }
+
+        return false;
     }
 
     /**
