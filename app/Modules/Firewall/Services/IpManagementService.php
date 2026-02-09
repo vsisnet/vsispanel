@@ -92,9 +92,8 @@ CONF;
         $dir = dirname($this->whitelistFile);
         Process::timeout(5)->run("sudo mkdir -p " . escapeshellarg($dir));
 
-        Process::timeout(10)->run(
-            'sudo tee ' . escapeshellarg($this->whitelistFile),
-            $content
+        Process::timeout(10)->input($content)->run(
+            'sudo tee ' . escapeshellarg($this->whitelistFile)
         );
 
         // Reload Fail2Ban

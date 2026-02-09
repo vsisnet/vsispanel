@@ -1074,9 +1074,8 @@ class RcloneService
         $dir = dirname($this->configPath);
         Process::timeout(5)->run("sudo mkdir -p " . escapeshellarg($dir));
 
-        $result = Process::timeout(10)->run(
-            'sudo tee ' . escapeshellarg($this->configPath),
-            $content
+        $result = Process::timeout(10)->input($content)->run(
+            'sudo tee ' . escapeshellarg($this->configPath)
         );
 
         if ($result->successful()) {

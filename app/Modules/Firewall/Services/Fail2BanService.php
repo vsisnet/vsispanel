@@ -648,9 +648,8 @@ CONF;
         $dir = dirname($path);
         Process::timeout(5)->run("sudo mkdir -p " . escapeshellarg($dir));
 
-        $result = Process::timeout(10)->run(
-            'sudo tee ' . escapeshellarg($path),
-            $content
+        $result = Process::timeout(10)->input($content)->run(
+            'sudo tee ' . escapeshellarg($path)
         );
 
         return $result->successful();
