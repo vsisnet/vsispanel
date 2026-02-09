@@ -238,9 +238,7 @@ class Fail2BanService
         $template = $this->generateJailConfig($name, $config);
         $path = "{$this->jailDir}/{$name}.conf";
 
-        $result = file_put_contents($path, $template);
-
-        if ($result !== false) {
+        if ($this->writeSystemFile($path, $template)) {
             Log::info('Custom Fail2Ban jail created', ['name' => $name]);
             $this->restart();
             return true;
@@ -392,7 +390,7 @@ CONF;
 
         $path = "{$this->configDir}/jail.local";
         if (!file_exists($path)) {
-            file_put_contents($path, $localConfig);
+            $this->writeSystemFile($path, $localConfig);
         }
     }
 
@@ -405,7 +403,7 @@ CONF;
         $configPath = "{$this->jailDir}/{$jail}.local";
         $config = "[{$jail}]\nenabled = true\n";
 
-        if (file_put_contents($configPath, $config) === false) {
+        if (!$this->writeSystemFile($configPath, $config)) {
             return [
                 'success' => false,
                 'error' => 'Failed to write jail config',
@@ -423,7 +421,7 @@ CONF;
         $configPath = "{$this->jailDir}/{$jail}.local";
         $config = "[{$jail}]\nenabled = false\n";
 
-        if (file_put_contents($configPath, $config) === false) {
+        if (!$this->writeSystemFile($configPath, $config)) {
             return [
                 'success' => false,
                 'error' => 'Failed to write jail config',
@@ -477,12 +475,8 @@ CONF;
         $configPath = "{$this->jailDir}/{$jail}.conf";
         $localPath = "{$this->jailDir}/{$jail}.local";
 
-        if (file_exists($configPath)) {
-            unlink($configPath);
-        }
-        if (file_exists($localPath)) {
-            unlink($localPath);
-        }
+        $this->deleteSystemFile($configPath);
+        $this->deleteSystemFile($localPath);
 
         return $this->reload();
     }
@@ -609,7 +603,7 @@ CONF;
             $content = "[DEFAULT]\n{$ignoreipLine}\n";
         }
 
-        if (file_put_contents($jailLocal, $content) === false) {
+        if (!$this->writeSystemFile($jailLocal, $content)) {
             return [
                 'success' => false,
                 'error' => 'Failed to write whitelist configuration',
@@ -647,10 +641,43 @@ CONF;
     }
 
     /**
-     * Run a shell command
+     * Write content to a system file using sudo
+     */
+    protected function writeSystemFile(string $path, string $content): bool
+    {
+        $dir = dirname($path);
+        Process::timeout(5)->run("sudo mkdir -p " . escapeshellarg($dir));
+
+        $result = Process::timeout(10)->run(
+            'sudo tee ' . escapeshellarg($path),
+            $content
+        );
+
+        return $result->successful();
+    }
+
+    /**
+     * Delete a system file using sudo
+     */
+    protected function deleteSystemFile(string $path): bool
+    {
+        if (!file_exists($path)) {
+            return true;
+        }
+
+        $result = Process::timeout(5)->run('sudo rm -f ' . escapeshellarg($path));
+        return $result->successful();
+    }
+
+    /**
+     * Run a shell command (with sudo for privileged commands)
      */
     protected function runCommand(string $command): array
     {
+        if (!str_starts_with($command, 'sudo ') && !str_starts_with($command, 'which ')) {
+            $command = "sudo {$command}";
+        }
+
         Log::debug('Running Fail2Ban command', ['command' => $command]);
 
         try {

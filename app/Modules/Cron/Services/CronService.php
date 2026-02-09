@@ -140,7 +140,7 @@ class CronService
         $tempFile = tempnam(sys_get_temp_dir(), 'cron');
         file_put_contents($tempFile, $crontabContent);
 
-        Process::timeout(10)->run("crontab -u {$username} {$tempFile}");
+        Process::timeout(10)->run("sudo crontab -u {$username} {$tempFile}");
         unlink($tempFile);
 
         Log::info("Synced crontab for user {$username}", ['jobs_count' => $jobs->count()]);

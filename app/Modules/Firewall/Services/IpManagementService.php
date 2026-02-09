@@ -90,11 +90,12 @@ ignoreip = {$ipList}
 CONF;
 
         $dir = dirname($this->whitelistFile);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
+        Process::timeout(5)->run("sudo mkdir -p " . escapeshellarg($dir));
 
-        file_put_contents($this->whitelistFile, $content);
+        Process::timeout(10)->run(
+            'sudo tee ' . escapeshellarg($this->whitelistFile),
+            $content
+        );
 
         // Reload Fail2Ban
         $this->fail2BanService->reload();

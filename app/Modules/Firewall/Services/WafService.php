@@ -373,6 +373,6 @@ class WafService
      */
     protected function reloadNginx(): void
     {
-        Process::run('systemctl reload nginx');
+        Process::run('sudo systemctl reload nginx');
     }
 }

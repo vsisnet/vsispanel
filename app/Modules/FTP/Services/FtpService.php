@@ -31,10 +31,10 @@ class FtpService
     {
         $serviceName = $this->ftpServer === 'pure-ftpd' ? 'pure-ftpd' : 'proftpd';
 
-        $result = Process::run("systemctl is-active {$serviceName}");
+        $result = Process::run("sudo systemctl is-active {$serviceName}");
         $isActive = trim($result->output()) === 'active';
 
-        $statusResult = Process::run("systemctl status {$serviceName} --no-pager -l");
+        $statusResult = Process::run("sudo systemctl status {$serviceName} --no-pager -l");
 
         return [
             'running' => $isActive,
@@ -444,8 +444,8 @@ class FtpService
             $passwdPath = config('vsispanel.ftp.pureftpd_passwd', '/etc/pure-ftpd/pureftpd.passwd');
             $pureDbPath = config('vsispanel.ftp.pureftpd_db', '/etc/pure-ftpd/pureftpd.pdb');
 
-            Process::run("pure-pw userdel {$account->username} -f {$passwdPath}");
-            Process::run("pure-pw mkdb {$pureDbPath} -f {$passwdPath}");
+            Process::run("sudo pure-pw userdel {$account->username} -f {$passwdPath}");
+            Process::run("sudo pure-pw mkdb {$pureDbPath} -f {$passwdPath}");
         } else {
             // Remove from ProFTPD users file
             $this->syncProftpd($account);
@@ -468,9 +468,9 @@ class FtpService
     public function getConnectedUsers(): array
     {
         if ($this->ftpServer === 'pure-ftpd') {
-            $result = Process::run('pure-ftpwho -s');
+            $result = Process::run('sudo pure-ftpwho -s');
         } else {
-            $result = Process::run('ftpwho -v');
+            $result = Process::run('sudo ftpwho -v');
         }
 
         $users = [];
@@ -496,10 +496,10 @@ class FtpService
     public function disconnectUser(string $username): bool
     {
         if ($this->ftpServer === 'pure-ftpd') {
-            $result = Process::run("pure-ftpwho -k {$username}");
+            $result = Process::run("sudo pure-ftpwho -k {$username}");
         } else {
             // ProFTPD uses ftpshut or kill
-            $result = Process::run("pkill -u {$username} -f proftpd");
+            $result = Process::run("sudo pkill -u {$username} -f proftpd");
         }
 
         return $result->successful();
@@ -533,7 +533,7 @@ class FtpService
     public function testConfig(): array
     {
         if ($this->ftpServer === 'proftpd') {
-            $result = Process::run("proftpd -t -c {$this->configPath}");
+            $result = Process::run("sudo proftpd -t -c {$this->configPath}");
 
             return [
                 'valid' => $result->successful(),
@@ -561,7 +561,7 @@ class FtpService
             return [];
         }
 
-        $result = Process::run("tail -n {$lines} {$logPath}");
+        $result = Process::run("sudo tail -n {$lines} {$logPath}");
         $logLines = explode("\n", trim($result->output()));
 
         return array_filter($logLines);
@@ -580,7 +580,7 @@ class FtpService
             return [];
         }
 
-        $result = Process::run("tail -n {$lines} {$logPath}");
+        $result = Process::run("sudo tail -n {$lines} {$logPath}");
         $logLines = explode("\n", trim($result->output()));
 
         return array_filter($logLines);
@@ -595,7 +595,7 @@ class FtpService
             return 0;
         }
 
-        $result = Process::run("du -sb {$path} | cut -f1");
+        $result = Process::run("sudo du -sb {$path} | cut -f1");
         return (int) trim($result->output());
     }
 }

@@ -84,10 +84,10 @@ class AppManagerService
             $isEnabled = false;
 
             if ($isInstalled && $serviceName) {
-                $result = Process::timeout(5)->run("systemctl is-active " . escapeshellarg($serviceName) . " 2>/dev/null");
+                $result = Process::timeout(5)->run("sudo systemctl is-active " . escapeshellarg($serviceName) . " 2>/dev/null");
                 $isRunning = $result->successful() && trim($result->output()) === 'active';
 
-                $result2 = Process::timeout(5)->run("systemctl is-enabled " . escapeshellarg($serviceName) . " 2>/dev/null");
+                $result2 = Process::timeout(5)->run("sudo systemctl is-enabled " . escapeshellarg($serviceName) . " 2>/dev/null");
                 $isEnabled = $result2->successful() && trim($result2->output()) === 'enabled';
             }
 

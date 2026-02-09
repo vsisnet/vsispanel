@@ -464,10 +464,14 @@ class FirewallService
     }
 
     /**
-     * Run a shell command
+     * Run a shell command (with sudo for privileged commands)
      */
     protected function runCommand(string $command): array
     {
+        if (!str_starts_with($command, 'sudo ')) {
+            $command = "sudo {$command}";
+        }
+
         Log::debug('Running firewall command', ['command' => $command]);
 
         try {
