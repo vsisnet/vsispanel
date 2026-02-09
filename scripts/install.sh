@@ -352,13 +352,32 @@ install_services() {
         # Pre-configure phpmyadmin to avoid interactive prompts
         echo "phpmyadmin phpmyadmin/dbconfig-install boolean false" | debconf-set-selections 2>/dev/null || true
         echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect none" | debconf-set-selections 2>/dev/null || true
-        apt-get install -y -qq phpmyadmin >> "$LOG_FILE" 2>&1 || {
-            # Retry with dependency fix
-            log_warn "phpMyAdmin install failed, retrying with dependency fix..."
+        # Attempt 1: standard install
+        if ! apt-get install -y -qq phpmyadmin >> "$LOG_FILE" 2>&1; then
+            # Attempt 2: fix deps and retry
+            log_warn "phpMyAdmin install failed, fixing deps..."
             apt-get update -qq >> "$LOG_FILE" 2>&1
+            dpkg --configure -a >> "$LOG_FILE" 2>&1 || true
             apt-get -f install -y >> "$LOG_FILE" 2>&1 || true
-            apt-get install -y phpmyadmin >> "$LOG_FILE" 2>&1 || true
-        }
+            if ! apt-get install -y phpmyadmin >> "$LOG_FILE" 2>&1; then
+                # Attempt 3: download directly
+                log_warn "phpMyAdmin apt install failed, downloading manually..."
+                local pma_ver="5.2.1"
+                local pma_dir="/usr/share/phpmyadmin"
+                wget -q "https://files.phpmyadmin.net/phpMyAdmin/${pma_ver}/phpMyAdmin-${pma_ver}-all-languages.tar.gz" -O /tmp/pma.tar.gz >> "$LOG_FILE" 2>&1 && {
+                    mkdir -p "$pma_dir"
+                    tar -xzf /tmp/pma.tar.gz -C "$pma_dir" --strip-components=1
+                    mkdir -p "${pma_dir}/tmp"
+                    chmod 777 "${pma_dir}/tmp"
+                    cp "${pma_dir}/config.sample.inc.php" "${pma_dir}/config.inc.php" 2>/dev/null || true
+                    # Set blowfish secret
+                    local pma_secret
+                    pma_secret=$(openssl rand -hex 16)
+                    sed -i "s/\$cfg\['blowfish_secret'\] = .*/\$cfg['blowfish_secret'] = '${pma_secret}';/" "${pma_dir}/config.inc.php" 2>/dev/null || true
+                    rm -f /tmp/pma.tar.gz
+                } || true
+            fi
+        fi
         if [[ -d /usr/share/phpmyadmin ]]; then
             log_ok "phpMyAdmin installed"
         else
@@ -387,15 +406,37 @@ install_services() {
     # Fail2Ban
     if ! command -v fail2ban-client &>/dev/null; then
         log_info "Installing Fail2Ban..."
-        apt-get install -y -qq fail2ban >> "$LOG_FILE" 2>&1 || {
-            log_warn "Fail2Ban install failed, retrying..."
+        if ! apt-get install -y -qq fail2ban >> "$LOG_FILE" 2>&1; then
+            log_warn "Fail2Ban install failed, fixing deps and retrying..."
             apt-get update -qq >> "$LOG_FILE" 2>&1
+            dpkg --configure -a >> "$LOG_FILE" 2>&1 || true
+            apt-get -f install -y >> "$LOG_FILE" 2>&1 || true
             apt-get install -y fail2ban >> "$LOG_FILE" 2>&1 || true
-        }
+        fi
         if command -v fail2ban-client &>/dev/null; then
             systemctl enable fail2ban >> "$LOG_FILE" 2>&1
             systemctl start fail2ban 2>/dev/null || true
-            log_ok "Fail2Ban installed"
+            # Create default jail config
+            if [[ ! -f /etc/fail2ban/jail.local ]]; then
+                cat > /etc/fail2ban/jail.local <<'F2BEOF'
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 5
+banaction = iptables-multiport
+backend = systemd
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+F2BEOF
+                systemctl restart fail2ban 2>/dev/null || true
+            fi
+            log_ok "Fail2Ban installed and configured"
         else
             log_warn "Fail2Ban installation failed"
         fi
@@ -450,13 +491,23 @@ install_services() {
     # Rclone for remote sync
     if ! command -v rclone &>/dev/null; then
         log_info "Installing Rclone..."
-        # Try official install script first, fallback to apt
-        curl -s https://rclone.org/install.sh | bash >> "$LOG_FILE" 2>&1 || {
-            log_warn "Rclone official install failed, trying apt..."
-            apt-get install -y -qq rclone >> "$LOG_FILE" 2>&1 || true
-        }
+        # Attempt 1: apt install
+        if ! apt-get install -y -qq rclone >> "$LOG_FILE" 2>&1; then
+            # Attempt 2: official install script
+            log_warn "Rclone apt install failed, trying official installer..."
+            curl -sL https://rclone.org/install.sh | bash >> "$LOG_FILE" 2>&1 || {
+                # Attempt 3: direct download
+                log_warn "Rclone official install failed, downloading binary..."
+                local rclone_arch="amd64"
+                [[ "$(uname -m)" == "aarch64" ]] && rclone_arch="arm64"
+                curl -sL "https://downloads.rclone.org/rclone-current-linux-${rclone_arch}.deb" -o /tmp/rclone.deb >> "$LOG_FILE" 2>&1 && {
+                    dpkg -i /tmp/rclone.deb >> "$LOG_FILE" 2>&1 || apt-get -f install -y >> "$LOG_FILE" 2>&1
+                    rm -f /tmp/rclone.deb
+                } || true
+            }
+        fi
         if command -v rclone &>/dev/null; then
-            log_ok "Rclone installed: $(rclone version --check 2>/dev/null | head -1 || echo 'OK')"
+            log_ok "Rclone installed: $(rclone version 2>/dev/null | head -1 || echo 'OK')"
         else
             log_warn "Rclone installation failed (backup remote sync won't work)"
         fi
@@ -547,8 +598,53 @@ setup_application() {
     fi
 
     # Set production environment
+    local server_ip
+    server_ip=$(hostname -I | awk '{print $1}')
+
     sed -i 's/^APP_ENV=.*/APP_ENV=production/' .env
     sed -i 's/^APP_DEBUG=.*/APP_DEBUG=false/' .env
+    sed -i "s|^APP_URL=.*|APP_URL=https://${server_ip}:8443|" .env
+    sed -i 's/^LOG_LEVEL=.*/LOG_LEVEL=warning/' .env
+
+    # Ensure critical .env settings for production
+    sed -i 's/^BROADCAST_CONNECTION=.*/BROADCAST_CONNECTION=reverb/' .env
+    sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=redis/' .env
+    sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=redis/' .env
+    sed -i 's/^CACHE_STORE=.*/CACHE_STORE=redis/' .env
+    log_ok "Production .env configured"
+
+    # Generate Reverb WebSocket credentials if not set
+    if grep -q "^REVERB_APP_ID=$" .env 2>/dev/null || ! grep -q "^REVERB_APP_ID=" .env 2>/dev/null; then
+        local reverb_id reverb_key reverb_secret
+        reverb_id=$((RANDOM * RANDOM % 900000 + 100000))
+        reverb_key=$(openssl rand -hex 16)
+        reverb_secret=$(openssl rand -hex 16)
+
+        # Remove existing Reverb lines (may be empty)
+        sed -i '/^REVERB_APP_ID/d' .env
+        sed -i '/^REVERB_APP_KEY/d' .env
+        sed -i '/^REVERB_APP_SECRET/d' .env
+        sed -i '/^REVERB_HOST/d' .env
+        sed -i '/^REVERB_PORT/d' .env
+        sed -i '/^REVERB_SCHEME/d' .env
+        sed -i '/^VITE_REVERB_/d' .env
+
+        cat >> .env <<REVERBEOF
+
+REVERB_APP_ID=${reverb_id}
+REVERB_APP_KEY=${reverb_key}
+REVERB_APP_SECRET=${reverb_secret}
+REVERB_HOST="localhost"
+REVERB_PORT=8080
+REVERB_SCHEME=http
+
+VITE_REVERB_APP_KEY="\${REVERB_APP_KEY}"
+VITE_REVERB_HOST="\${REVERB_HOST}"
+VITE_REVERB_PORT="\${REVERB_PORT}"
+VITE_REVERB_SCHEME="\${REVERB_SCHEME}"
+REVERBEOF
+        log_ok "Reverb WebSocket credentials generated"
+    fi
 
     # Install PHP dependencies (increase memory limit for low-RAM VPS)
     log_info "Installing PHP dependencies (this may take a few minutes)..."
@@ -827,7 +923,7 @@ Wants=redis-server.service
 Type=simple
 User=root
 WorkingDirectory=/opt/vsispanel
-ExecStart=/usr/bin/php artisan reverb:start
+ExecStart=/usr/bin/php artisan reverb:start --host=127.0.0.1 --port=8080
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -877,7 +973,16 @@ SVCEOF
         systemctl enable "${svc}.service" >> "$LOG_FILE" 2>&1 || true
         systemctl start "${svc}.service" >> "$LOG_FILE" 2>&1 || true
     done
-    log_ok "Panel services enabled and started"
+
+    # Verify panel services started
+    sleep 2
+    for svc in vsispanel-horizon vsispanel-reverb vsispanel-terminal; do
+        if systemctl is-active --quiet "${svc}.service" 2>/dev/null; then
+            log_ok "${svc}: running"
+        else
+            log_warn "${svc}: failed to start (check: journalctl -u ${svc} -n 20)"
+        fi
+    done
 
     # Remove any conflicting supervisor configs (systemd handles these services)
     if command -v supervisorctl &>/dev/null && [[ -d /etc/supervisor/conf.d ]]; then
@@ -893,16 +998,20 @@ SVCEOF
 
     # Open firewall ports if UFW is active
     if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
-        ufw allow 8443/tcp >> "$LOG_FILE" 2>&1 || true
+        ufw allow 22/tcp >> "$LOG_FILE" 2>&1 || true
         ufw allow 80/tcp >> "$LOG_FILE" 2>&1 || true
         ufw allow 443/tcp >> "$LOG_FILE" 2>&1 || true
-        log_ok "Firewall ports opened (80, 443, 8443)"
+        ufw allow 8443/tcp >> "$LOG_FILE" 2>&1 || true
+        log_ok "Firewall ports opened (22, 80, 443, 8443)"
     fi
 
-    # Optimize
+    # Optimize (cache config, routes, views)
     log_info "Optimizing application..."
-    php artisan vsispanel:optimize >> "$LOG_FILE" 2>&1 || true
-    log_ok "Application optimized"
+    php artisan config:cache >> "$LOG_FILE" 2>&1 || true
+    php artisan route:cache >> "$LOG_FILE" 2>&1 || true
+    php artisan view:cache >> "$LOG_FILE" 2>&1 || true
+    php artisan event:cache >> "$LOG_FILE" 2>&1 || true
+    log_ok "Application optimized (config/route/view/event cached)"
 
     # Mark as installed
     touch "${PANEL_DIR}/storage/installed"
