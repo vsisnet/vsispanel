@@ -35,13 +35,9 @@ class RcloneService
     protected function fixConfigPermissions(): void
     {
         try {
-            if (file_exists($this->configPath)) {
-                chmod($this->configPath, 0660);
-                // Set group to www-data if running as root
-                if (posix_getuid() === 0) {
-                    chgrp($this->configPath, 'www-data');
-                }
-            }
+            $path = escapeshellarg($this->configPath);
+            Process::timeout(5)->run("sudo chmod 660 {$path}");
+            Process::timeout(5)->run("sudo chown root:www-data {$path}");
         } catch (\Exception $e) {
             Log::warning('Failed to fix rclone config permissions', ['error' => $e->getMessage()]);
         }
