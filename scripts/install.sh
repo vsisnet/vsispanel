@@ -646,11 +646,11 @@ REVERBEOF
         log_ok "Reverb WebSocket credentials generated"
     fi
 
-    # Generate OAuth Proxy Client ID if not set
-    if grep -q "^OAUTH_PROXY_CLIENT_ID=$" .env 2>/dev/null || ! grep -q "^OAUTH_PROXY_CLIENT_ID=" .env 2>/dev/null; then
-        local oauth_client_id
-        oauth_client_id="vsp_$(openssl rand -hex 24)"
-        sed -i '/^OAUTH_PROXY_CLIENT_ID/d' .env
+    # Set OAuth Proxy Client ID (registered with proxy server)
+    local oauth_client_id="vsp_f929aca8527fae26626b7b9340e359dbcb00f39b9b325364"
+    if grep -q "^OAUTH_PROXY_CLIENT_ID=" .env 2>/dev/null; then
+        sed -i "s|^OAUTH_PROXY_CLIENT_ID=.*|OAUTH_PROXY_CLIENT_ID=${oauth_client_id}|" .env
+    else
         # Append after OAUTH_PROXY_URL or at end
         if grep -q "^OAUTH_PROXY_URL=" .env; then
             sed -i "/^OAUTH_PROXY_URL=.*/a OAUTH_PROXY_CLIENT_ID=${oauth_client_id}" .env
@@ -659,8 +659,8 @@ REVERBEOF
             echo "OAUTH_PROXY_URL=https://app-oauth.vsis.net" >> .env
             echo "OAUTH_PROXY_CLIENT_ID=${oauth_client_id}" >> .env
         fi
-        log_ok "OAuth Proxy Client ID generated"
     fi
+    log_ok "OAuth Proxy Client ID configured"
 
     # Install PHP dependencies (increase memory limit for low-RAM VPS)
     log_info "Installing PHP dependencies (this may take a few minutes)..."

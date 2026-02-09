@@ -116,6 +116,14 @@ class OAuthController extends Controller
     public function callback(Request $request, string $provider): RedirectResponse
     {
         try {
+            Log::info('OAuth callback received', [
+                'provider' => $provider,
+                'has_tokens' => $request->has('tokens'),
+                'has_state' => $request->has('state'),
+                'has_error' => $request->has('error'),
+                'query_keys' => array_keys($request->query()),
+            ]);
+
             $state = $request->input('state');
             $encryptedTokens = $request->input('tokens');
             $error = $request->input('error');
@@ -177,13 +185,14 @@ class OAuthController extends Controller
             }
 
             return redirect('/backup?tab=remotes&oauth_success=true&remote_id=' . $result['remote_id']);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('OAuth callback exception', [
                 'provider' => $provider,
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return redirect('/backup?tab=remotes&oauth_error=' . urlencode($e->getMessage()));
         }
@@ -197,8 +206,16 @@ class OAuthController extends Controller
         $proxyUrl = config('backup.oauth.proxy_url');
         $proxyClientId = config('backup.oauth.proxy_client_id');
 
+        Log::info('Decrypting tokens from proxy', [
+            'proxy_url' => $proxyUrl,
+            'has_client_id' => !empty($proxyClientId),
+            'client_id_prefix' => $proxyClientId ? substr($proxyClientId, 0, 10) . '...' : 'empty',
+            'provider' => $provider,
+            'tokens_length' => strlen($encryptedTokens),
+        ]);
+
         try {
-            $response = Http::post("{$proxyUrl}/api/tokens/decrypt", [
+            $response = Http::timeout(15)->post("{$proxyUrl}/api/tokens/decrypt", [
                 'client_id' => $proxyClientId,
                 'encrypted_tokens' => $encryptedTokens,
                 'provider' => $provider,
@@ -206,11 +223,12 @@ class OAuthController extends Controller
 
             if ($response->successful()) {
                 $data = $response->json();
-                if ($data['success'] && isset($data['tokens'])) {
+                if (is_array($data) && !empty($data['success']) && isset($data['tokens'])) {
                     $tokens = $data['tokens'];
+                    Log::info('Token decrypt successful', ['provider' => $provider]);
                     return [
-                        'access_token' => $tokens['access_token'],
-                        'refresh_token' => $tokens['refresh_token'],
+                        'access_token' => $tokens['access_token'] ?? '',
+                        'refresh_token' => $tokens['refresh_token'] ?? '',
                         'token_type' => $tokens['token_type'] ?? 'Bearer',
                         'expires_in' => $tokens['expires_in'] ?? 3600,
                         'expiry' => now()->addSeconds($tokens['expires_in'] ?? 3600)->toIso8601String(),
@@ -222,12 +240,15 @@ class OAuthController extends Controller
 
             Log::error('Token decrypt failed', [
                 'status' => $response->status(),
-                'body' => $response->body(),
+                'body' => substr($response->body(), 0, 500),
             ]);
 
             return null;
-        } catch (\Exception $e) {
-            Log::error('Token decrypt exception', ['error' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            Log::error('Token decrypt exception', [
+                'error' => $e->getMessage(),
+                'class' => get_class($e),
+            ]);
             return null;
         }
     }
