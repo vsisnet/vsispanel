@@ -352,8 +352,18 @@ install_services() {
         # Pre-configure phpmyadmin to avoid interactive prompts
         echo "phpmyadmin phpmyadmin/dbconfig-install boolean false" | debconf-set-selections 2>/dev/null || true
         echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect none" | debconf-set-selections 2>/dev/null || true
-        apt-get install -y -qq phpmyadmin >> "$LOG_FILE" 2>&1 || true
-        log_ok "phpMyAdmin installed"
+        apt-get install -y -qq phpmyadmin >> "$LOG_FILE" 2>&1 || {
+            # Retry with dependency fix
+            log_warn "phpMyAdmin install failed, retrying with dependency fix..."
+            apt-get update -qq >> "$LOG_FILE" 2>&1
+            apt-get -f install -y >> "$LOG_FILE" 2>&1 || true
+            apt-get install -y phpmyadmin >> "$LOG_FILE" 2>&1 || true
+        }
+        if [[ -d /usr/share/phpmyadmin ]]; then
+            log_ok "phpMyAdmin installed"
+        else
+            log_warn "phpMyAdmin installation failed (panel will work without it)"
+        fi
     fi
 
     # Optional: Mail server
@@ -377,10 +387,18 @@ install_services() {
     # Fail2Ban
     if ! command -v fail2ban-client &>/dev/null; then
         log_info "Installing Fail2Ban..."
-        apt-get install -y -qq fail2ban >> "$LOG_FILE" 2>&1
-        systemctl enable fail2ban >> "$LOG_FILE" 2>&1
-        systemctl start fail2ban
-        log_ok "Fail2Ban installed"
+        apt-get install -y -qq fail2ban >> "$LOG_FILE" 2>&1 || {
+            log_warn "Fail2Ban install failed, retrying..."
+            apt-get update -qq >> "$LOG_FILE" 2>&1
+            apt-get install -y fail2ban >> "$LOG_FILE" 2>&1 || true
+        }
+        if command -v fail2ban-client &>/dev/null; then
+            systemctl enable fail2ban >> "$LOG_FILE" 2>&1
+            systemctl start fail2ban 2>/dev/null || true
+            log_ok "Fail2Ban installed"
+        else
+            log_warn "Fail2Ban installation failed"
+        fi
     else
         log_ok "Fail2Ban already installed"
     fi
@@ -415,15 +433,35 @@ install_services() {
     # Restic for backups
     if ! command -v restic &>/dev/null; then
         log_info "Installing Restic..."
-        apt-get install -y -qq restic >> "$LOG_FILE" 2>&1
-        log_ok "Restic installed"
+        apt-get install -y -qq restic >> "$LOG_FILE" 2>&1 || {
+            log_warn "Restic install failed, retrying..."
+            apt-get update -qq >> "$LOG_FILE" 2>&1
+            apt-get install -y restic >> "$LOG_FILE" 2>&1 || true
+        }
+        if command -v restic &>/dev/null; then
+            log_ok "Restic installed"
+        else
+            log_warn "Restic installation failed (backup won't work)"
+        fi
+    else
+        log_ok "Restic already installed"
     fi
 
     # Rclone for remote sync
     if ! command -v rclone &>/dev/null; then
         log_info "Installing Rclone..."
-        curl -s https://rclone.org/install.sh | bash >> "$LOG_FILE" 2>&1 || apt-get install -y -qq rclone >> "$LOG_FILE" 2>&1
-        log_ok "Rclone installed"
+        # Try official install script first, fallback to apt
+        curl -s https://rclone.org/install.sh | bash >> "$LOG_FILE" 2>&1 || {
+            log_warn "Rclone official install failed, trying apt..."
+            apt-get install -y -qq rclone >> "$LOG_FILE" 2>&1 || true
+        }
+        if command -v rclone &>/dev/null; then
+            log_ok "Rclone installed: $(rclone version --check 2>/dev/null | head -1 || echo 'OK')"
+        else
+            log_warn "Rclone installation failed (backup remote sync won't work)"
+        fi
+    else
+        log_ok "Rclone already installed"
     fi
 
     # Supervisor (for compatibility, not used for panel services)
@@ -432,6 +470,31 @@ install_services() {
         apt-get install -y -qq supervisor >> "$LOG_FILE" 2>&1
         systemctl enable supervisor >> "$LOG_FILE" 2>&1
         log_ok "Supervisor installed"
+    fi
+
+    # Verification summary
+    log_info "Verifying installed services..."
+    local all_ok=true
+    for pkg_cmd in "mysql:mysql" "redis-cli:redis" "nginx:nginx" "fail2ban-client:fail2ban" \
+                   "restic:restic" "rclone:rclone" "proftpd:proftpd" "certbot:certbot"; do
+        local cmd="${pkg_cmd%%:*}"
+        local label="${pkg_cmd##*:}"
+        if command -v "$cmd" &>/dev/null; then
+            log_ok "${label}: OK"
+        else
+            log_warn "${label}: NOT FOUND"
+            all_ok=false
+        fi
+    done
+    if [[ -d /usr/share/phpmyadmin ]]; then
+        log_ok "phpMyAdmin: OK"
+    else
+        log_warn "phpMyAdmin: NOT FOUND"
+        all_ok=false
+    fi
+    if [[ "$all_ok" == false ]]; then
+        log_warn "Some packages failed to install. Panel may have limited functionality."
+        log_warn "Check ${LOG_FILE} for details. You can install missing packages manually."
     fi
 }
 

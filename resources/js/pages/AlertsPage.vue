@@ -342,7 +342,7 @@ const saving = ref(false)
 const showConfirm = ref(false)
 let deleteTarget = null
 
-const managedServices = ['nginx', 'mysql', 'redis-server', 'php8.3-fpm', 'postfix', 'dovecot', 'named', 'fail2ban', 'vsispanel-web', 'vsispanel-horizon']
+const managedServices = ['nginx', 'mysql', 'redis-server', 'php8.3-fpm', 'postfix', 'dovecot', 'named', 'fail2ban', 'vsispanel-horizon', 'vsispanel-reverb']
 
 const form = ref(getDefaultForm())
 

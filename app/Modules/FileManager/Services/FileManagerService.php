@@ -179,8 +179,13 @@ class FileManagerService
         }
 
         $items = [];
-        $entries = File::files($fullPath);
-        $directories = File::directories($fullPath);
+
+        try {
+            $entries = File::files($fullPath);
+            $directories = File::directories($fullPath);
+        } catch (\Exception $e) {
+            throw new RuntimeException('Cannot read directory: Permission denied.');
+        }
 
         // Add directories
         foreach ($directories as $dir) {
@@ -189,14 +194,25 @@ class FileManagerService
                 continue;
             }
 
-            $items[] = [
-                'name' => $name,
-                'path' => $relativePath ? $relativePath . '/' . $name : $name,
-                'type' => 'directory',
-                'size' => $this->getDirectorySize($dir),
-                'permissions' => substr(sprintf('%o', fileperms($dir)), -4),
-                'modified_at' => date('c', filemtime($dir)),
-            ];
+            try {
+                $items[] = [
+                    'name' => $name,
+                    'path' => $relativePath ? $relativePath . '/' . $name : $name,
+                    'type' => 'directory',
+                    'size' => $this->getDirectorySize($dir),
+                    'permissions' => substr(sprintf('%o', fileperms($dir)), -4),
+                    'modified_at' => date('c', filemtime($dir)),
+                ];
+            } catch (\Exception $e) {
+                $items[] = [
+                    'name' => $name,
+                    'path' => $relativePath ? $relativePath . '/' . $name : $name,
+                    'type' => 'directory',
+                    'size' => 0,
+                    'permissions' => '0000',
+                    'modified_at' => date('c'),
+                ];
+            }
         }
 
         // Add files
@@ -206,17 +222,21 @@ class FileManagerService
                 continue;
             }
 
-            $items[] = [
-                'name' => $name,
-                'path' => $relativePath ? $relativePath . '/' . $name : $name,
-                'type' => 'file',
-                'size' => $file->getSize(),
-                'extension' => $file->getExtension(),
-                'mime_type' => File::mimeType($file->getPathname()),
-                'permissions' => substr(sprintf('%o', $file->getPerms()), -4),
-                'modified_at' => date('c', $file->getMTime()),
-                'is_editable' => $this->isEditable($file->getPathname()),
-            ];
+            try {
+                $items[] = [
+                    'name' => $name,
+                    'path' => $relativePath ? $relativePath . '/' . $name : $name,
+                    'type' => 'file',
+                    'size' => $file->getSize(),
+                    'extension' => $file->getExtension(),
+                    'mime_type' => File::mimeType($file->getPathname()),
+                    'permissions' => substr(sprintf('%o', $file->getPerms()), -4),
+                    'modified_at' => date('c', $file->getMTime()),
+                    'is_editable' => $this->isEditable($file->getPathname()),
+                ];
+            } catch (\Exception $e) {
+                continue;
+            }
         }
 
         // Sort: directories first, then by name
@@ -937,7 +957,8 @@ class FileManagerService
         $results = [];
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($searchPath, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
+            \RecursiveIteratorIterator::SELF_FIRST,
+            \RecursiveIteratorIterator::CATCH_GET_CHILD
         );
 
         $query = strtolower($query);
@@ -1202,14 +1223,26 @@ class FileManagerService
     {
         $size = 0;
 
-        if (!File::isDirectory($path)) {
+        if (!File::isDirectory($path) || !is_readable($path)) {
             return $size;
         }
 
-        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS)) as $file) {
-            if ($file->isFile()) {
-                $size += $file->getSize();
+        try {
+            foreach (new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::LEAVES_ONLY,
+                \RecursiveIteratorIterator::CATCH_GET_CHILD
+            ) as $file) {
+                try {
+                    if ($file->isFile()) {
+                        $size += $file->getSize();
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
             }
+        } catch (\Exception $e) {
+            return $size;
         }
 
         return $size;
@@ -1374,17 +1407,22 @@ class FileManagerService
 
         $files = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::SELF_FIRST
+            \RecursiveIteratorIterator::SELF_FIRST,
+            \RecursiveIteratorIterator::CATCH_GET_CHILD
         );
 
         foreach ($files as $file) {
-            $filePath = $file->getPathname();
-            $localPath = $relativePath . '/' . substr($filePath, strlen($path) + 1);
+            try {
+                $filePath = $file->getPathname();
+                $localPath = $relativePath . '/' . substr($filePath, strlen($path) + 1);
 
-            if ($file->isDir()) {
-                $zip->addEmptyDir($localPath);
-            } else {
-                $zip->addFile($filePath, $localPath);
+                if ($file->isDir()) {
+                    $zip->addEmptyDir($localPath);
+                } else {
+                    $zip->addFile($filePath, $localPath);
+                }
+            } catch (\Exception $e) {
+                continue;
             }
         }
     }
