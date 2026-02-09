@@ -646,6 +646,22 @@ REVERBEOF
         log_ok "Reverb WebSocket credentials generated"
     fi
 
+    # Generate OAuth Proxy Client ID if not set
+    if grep -q "^OAUTH_PROXY_CLIENT_ID=$" .env 2>/dev/null || ! grep -q "^OAUTH_PROXY_CLIENT_ID=" .env 2>/dev/null; then
+        local oauth_client_id
+        oauth_client_id="vsp_$(openssl rand -hex 24)"
+        sed -i '/^OAUTH_PROXY_CLIENT_ID/d' .env
+        # Append after OAUTH_PROXY_URL or at end
+        if grep -q "^OAUTH_PROXY_URL=" .env; then
+            sed -i "/^OAUTH_PROXY_URL=.*/a OAUTH_PROXY_CLIENT_ID=${oauth_client_id}" .env
+        else
+            echo "" >> .env
+            echo "OAUTH_PROXY_URL=https://app-oauth.vsis.net" >> .env
+            echo "OAUTH_PROXY_CLIENT_ID=${oauth_client_id}" >> .env
+        fi
+        log_ok "OAuth Proxy Client ID generated"
+    fi
+
     # Install PHP dependencies (increase memory limit for low-RAM VPS)
     log_info "Installing PHP dependencies (this may take a few minutes)..."
     if ! COMPOSER_MEMORY_LIMIT=-1 composer install --no-interaction --optimize-autoloader --no-dev >> "$LOG_FILE" 2>&1; then
