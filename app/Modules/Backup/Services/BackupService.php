@@ -1334,14 +1334,58 @@ class BackupService
                 ];
             }
 
-            // Parse NDJSON output
+            // Parse NDJSON output - filter out snapshot info and the path itself
             $files = [];
+            $normalizedPath = rtrim($path, '/') ?: '/';
             $lines = explode("\n", trim($process->getOutput()));
+
             foreach ($lines as $line) {
-                if ($line) {
-                    $files[] = json_decode($line, true);
+                if (!$line) {
+                    continue;
                 }
+
+                $entry = json_decode($line, true);
+                if (!$entry) {
+                    continue;
+                }
+
+                // Skip snapshot info line (first line of restic ls --json output)
+                if (($entry['struct_type'] ?? '') === 'snapshot') {
+                    continue;
+                }
+
+                // Skip the requested path itself (restic includes it in output)
+                $entryPath = $entry['path'] ?? '';
+                if ($entryPath === $normalizedPath) {
+                    continue;
+                }
+
+                // Only include direct children of the requested path
+                $parentDir = dirname($entryPath);
+                if ($parentDir !== $normalizedPath) {
+                    continue;
+                }
+
+                $files[] = [
+                    'name' => $entry['name'] ?? basename($entryPath),
+                    'type' => $entry['type'] ?? 'file',
+                    'path' => $entryPath,
+                    'size' => $entry['size'] ?? null,
+                    'mtime' => $entry['mtime'] ?? null,
+                    'permissions' => $entry['permissions'] ?? null,
+                ];
             }
+
+            // Sort: directories first, then by name
+            usort($files, function ($a, $b) {
+                if ($a['type'] === 'dir' && $b['type'] !== 'dir') {
+                    return -1;
+                }
+                if ($a['type'] !== 'dir' && $b['type'] === 'dir') {
+                    return 1;
+                }
+                return strcasecmp($a['name'], $b['name']);
+            });
 
             return [
                 'success' => true,
