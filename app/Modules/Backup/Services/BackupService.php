@@ -23,6 +23,22 @@ class BackupService
     private const SQL_DUMP_DIR = '/tmp/vsispanel_sql_dumps';
 
     /**
+     * Build restic command array with sudo -E prefix when not running as root.
+     * This ensures restic can access the repository from both
+     * PHP-FPM (www-data) and Horizon (root) contexts.
+     */
+    private function resticCommand(array $args): array
+    {
+        $command = [self::RESTIC_BIN, ...$args];
+
+        if (posix_getuid() !== 0) {
+            array_unshift($command, 'sudo', '-E');
+        }
+
+        return $command;
+    }
+
+    /**
      * Initialize a new Restic repository
      */
     public function initRepository(BackupConfig $config): array
@@ -44,11 +60,10 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'init',
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(300);
 
@@ -92,12 +107,11 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'snapshots',
             '--json',
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(60);
 
@@ -188,15 +202,14 @@ class BackupService
         $excludes = $this->buildExcludeArgs($config);
 
         // Build restic command
-        $command = [
-            self::RESTIC_BIN,
+        $command = $this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'backup',
             '--json',
             '--tag', 'vsispanel',
             '--tag', "type:{$backup->type}",
             '--tag', "user:{$backup->user_id}",
-        ];
+        ]);
 
         // Add excludes
         foreach ($excludes as $exclude) {
@@ -378,13 +391,12 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'snapshots',
             '--json',
             '--tag', 'vsispanel',
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(120);
 
@@ -430,13 +442,12 @@ class BackupService
         );
 
         // Use restic snapshots command with the specific snapshot ID
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'snapshots',
             $snapshotId,
             '--json',
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(60);
 
@@ -609,13 +620,12 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $command = [
-            self::RESTIC_BIN,
+        $command = $this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'restore',
             $backup->snapshot_id,
             '--target', $targetPath,
-        ];
+        ]);
 
         // Add specific paths to restore
         foreach ($includePaths as $path) {
@@ -750,13 +760,12 @@ class BackupService
         );
 
         // Check if SQL dump directory exists in backup
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'ls',
             $backup->snapshot_id,
             self::SQL_DUMP_DIR,
-        ], null, $env);
+        ]), null, $env);
         $process->setTimeout(30);
         $process->run();
 
@@ -811,14 +820,13 @@ class BackupService
         );
 
         // Extract SQL dumps from backup
-        $command = [
-            self::RESTIC_BIN,
+        $command = $this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'restore',
             $backup->snapshot_id,
             '--target', $tempDir,
             '--include', self::SQL_DUMP_DIR,
-        ];
+        ]);
 
         $output .= "Extracting SQL dumps from backup...\n";
         $output .= "Command: " . implode(' ', array_map(fn($c) => str_contains($c, ' ') ? "\"$c\"" : $c, $command)) . "\n";
@@ -1122,12 +1130,11 @@ class BackupService
 
         // Use 'forget' without --prune for fast deletion.
         // Pruning is expensive and should be done separately (e.g. scheduled maintenance).
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'forget',
             $snapshotId,
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(30);
 
@@ -1182,13 +1189,12 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $command = [
-            self::RESTIC_BIN,
+        $command = $this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'forget',
             '--prune',
             '--tag', 'vsispanel',
-        ];
+        ]);
 
         // Add retention flags
         if (isset($retention['keep_last'])) {
@@ -1259,12 +1265,11 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'stats',
             '--json',
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(300);
 
@@ -1313,14 +1318,13 @@ class BackupService
             [self::DEFAULT_PASSWORD_ENV => $password]
         );
 
-        $process = new Process([
-            self::RESTIC_BIN,
+        $process = new Process($this->resticCommand([
             '-r', $destination->getRepositoryUrl(),
             'ls',
             '--json',
             $backup->snapshot_id,
             $path,
-        ], null, $env);
+        ]), null, $env);
 
         $process->setTimeout(120);
 
