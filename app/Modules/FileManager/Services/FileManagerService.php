@@ -308,14 +308,16 @@ class FileManagerService
             throw new RuntimeException('This file is protected and cannot be modified.');
         }
 
+        $owner = $this->getDomainOwner($domain);
+
         // Create backup before saving
         if (File::exists($fullPath)) {
-            $backupPath = $fullPath . '.bak';
-            File::copy($fullPath, $backupPath);
+            $this->rootCopy($fullPath, $fullPath . '.bak', $owner);
         }
 
-        File::put($fullPath, $content);
+        $this->rootWriteFile($fullPath, $content, $owner);
 
+        clearstatcache(true, $fullPath);
         return [
             'name' => basename($fullPath),
             'path' => $relativePath,
@@ -340,14 +342,17 @@ class FileManagerService
             throw new RuntimeException('File extension is not allowed.');
         }
 
+        $owner = $this->getDomainOwner($domain);
+
         // Ensure parent directory exists
         $directory = dirname($fullPath);
         if (!File::isDirectory($directory)) {
-            File::makeDirectory($directory, 0755, true);
+            $this->rootMkdir($directory, $owner);
         }
 
-        File::put($fullPath, $content);
+        $this->rootWriteFile($fullPath, $content, $owner);
 
+        clearstatcache(true, $fullPath);
         return [
             'name' => basename($fullPath),
             'path' => $relativePath,
@@ -367,8 +372,9 @@ class FileManagerService
             throw new RuntimeException('Directory already exists.');
         }
 
-        File::makeDirectory($fullPath, 0755, true);
+        $this->rootMkdir($fullPath, $this->getDomainOwner($domain));
 
+        clearstatcache(true, $fullPath);
         return [
             'name' => basename($fullPath),
             'path' => $relativePath,
@@ -388,6 +394,7 @@ class FileManagerService
             throw new RuntimeException('Upload directory not found.');
         }
 
+        $owner = $this->getDomainOwner($domain);
         $uploaded = [];
         $errors = [];
 
@@ -397,14 +404,18 @@ class FileManagerService
                 $this->validateUploadedFile($file);
 
                 $filename = $this->getUniqueFilename($directory, $file->getClientOriginalName());
-                $file->move($directory, $filename);
+                $tempPath = $file->getPathname();
+                $destPath = $directory . '/' . $filename;
 
-                $fullPath = $directory . '/' . $filename;
+                // Use sudo cp instead of move (which fails on permission)
+                $this->rootCopy($tempPath, $destPath, $owner);
+
+                clearstatcache(true, $destPath);
                 $uploaded[] = [
                     'name' => $filename,
                     'path' => $relativePath ? $relativePath . '/' . $filename : $filename,
-                    'size' => filesize($fullPath),
-                    'modified_at' => date('c', filemtime($fullPath)),
+                    'size' => filesize($destPath),
+                    'modified_at' => date('c', filemtime($destPath)),
                 ];
             } catch (\Exception $e) {
                 $errors[] = [
@@ -473,7 +484,7 @@ class FileManagerService
             }
         }
 
-        File::move($fullPath, $newPath);
+        $this->rootMove($fullPath, $newPath);
 
         $newRelativePath = dirname($relativePath) === '.'
             ? $newName
@@ -502,23 +513,21 @@ class FileManagerService
             throw new RuntimeException('Destination already exists.');
         }
 
-        if (File::isDirectory($sourceFullPath)) {
-            File::copyDirectory($sourceFullPath, $destFullPath);
-        } else {
-            // Check extension
+        $owner = $this->getDomainOwner($domain);
+
+        if (!File::isDirectory($sourceFullPath)) {
             $extension = pathinfo($destFullPath, PATHINFO_EXTENSION);
             if (!$this->isExtensionAllowed($extension)) {
                 throw new RuntimeException('File extension is not allowed.');
             }
 
-            // Ensure destination directory exists
             $destDir = dirname($destFullPath);
             if (!File::isDirectory($destDir)) {
-                File::makeDirectory($destDir, 0755, true);
+                $this->rootMkdir($destDir, $owner);
             }
-
-            File::copy($sourceFullPath, $destFullPath);
         }
+
+        $this->rootCopy($sourceFullPath, $destFullPath, $owner);
 
         return [
             'name' => basename($destFullPath),
@@ -550,10 +559,10 @@ class FileManagerService
         // Ensure destination directory exists
         $destDir = dirname($destFullPath);
         if (!File::isDirectory($destDir)) {
-            File::makeDirectory($destDir, 0755, true);
+            $this->rootMkdir($destDir, $this->getDomainOwner($domain));
         }
 
-        File::move($sourceFullPath, $destFullPath);
+        $this->rootMove($sourceFullPath, $destFullPath);
 
         return [
             'name' => basename($destFullPath),
@@ -577,11 +586,7 @@ class FileManagerService
             throw new RuntimeException('This item is protected and cannot be deleted.');
         }
 
-        if (File::isDirectory($fullPath)) {
-            File::deleteDirectory($fullPath);
-        } else {
-            File::delete($fullPath);
-        }
+        $this->rootDelete($fullPath);
     }
 
     /**
@@ -689,7 +694,7 @@ class FileManagerService
         }
 
         if (!File::isDirectory($destFullPath)) {
-            File::makeDirectory($destFullPath, 0755, true);
+            $this->rootMkdir($destFullPath, $this->getDomainOwner($domain));
         }
 
         $count = 0;
@@ -709,6 +714,10 @@ class FileManagerService
                 $count = $this->extractGz($fullArchivePath, $destFullPath);
                 break;
         }
+
+        // Fix ownership after extraction
+        $owner = $this->getDomainOwner($domain);
+        $this->executor->executeAsRoot('chown', ['-R', "{$owner}:{$owner}", $destFullPath]);
 
         $basePath = $this->getDomainPath($domain);
         $relativePath = str_replace($basePath . '/', '', $destFullPath);
@@ -935,7 +944,8 @@ class FileManagerService
 
         $mode = octdec($permissions);
 
-        if (!chmod($fullPath, $mode)) {
+        $result = $this->executor->executeAsRoot('chmod', [decoct($mode), $fullPath]);
+        if (!$result->success) {
             throw new RuntimeException('Failed to change permissions.');
         }
 
@@ -1118,9 +1128,7 @@ class FileManagerService
         }
 
         // Save the file
-        if (File::put($fullPath, $content) === false) {
-            throw new RuntimeException('Failed to save downloaded file.');
-        }
+        $this->rootWriteFile($fullPath, $content, $this->getDomainOwner($domain));
 
         $basePath = $this->getDomainPath($domain);
         $savedRelativePath = str_replace($basePath . '/', '', $fullPath);
@@ -1132,6 +1140,95 @@ class FileManagerService
             'formatted_size' => $this->formatBytes($downloadedSize),
             'modified_at' => date('c', filemtime($fullPath)),
         ];
+    }
+
+    // =========================================================================
+    // Root File Operations (domain files owned by domain user, not www-data)
+    // =========================================================================
+
+    /**
+     * Write content to a file using sudo.
+     */
+    protected function rootWriteFile(string $path, string $content, ?string $owner = null): void
+    {
+        $tempFile = sys_get_temp_dir() . '/vsispanel_' . uniqid() . '_' . basename($path);
+        file_put_contents($tempFile, $content);
+
+        $dirPath = dirname($path);
+        if (!is_dir($dirPath)) {
+            $this->executor->executeAsRoot('mkdir', ['-p', $dirPath]);
+        }
+
+        $result = $this->executor->executeAsRoot('cp', [$tempFile, $path]);
+        @unlink($tempFile);
+
+        if (!$result->success) {
+            throw new RuntimeException("Failed to write file: {$result->stderr}");
+        }
+
+        if ($owner) {
+            $this->executor->executeAsRoot('chown', ["{$owner}:{$owner}", $path]);
+        }
+        $this->executor->executeAsRoot('chmod', ['644', $path]);
+    }
+
+    /**
+     * Copy a file or directory using sudo.
+     */
+    protected function rootCopy(string $source, string $dest, ?string $owner = null): void
+    {
+        $result = $this->executor->executeAsRoot('cp', ['-a', $source, $dest]);
+        if (!$result->success) {
+            throw new RuntimeException("Failed to copy: {$result->stderr}");
+        }
+        if ($owner) {
+            $this->executor->executeAsRoot('chown', ['-R', "{$owner}:{$owner}", $dest]);
+        }
+    }
+
+    /**
+     * Move/rename a file or directory using sudo.
+     */
+    protected function rootMove(string $source, string $dest): void
+    {
+        $result = $this->executor->executeAsRoot('mv', [$source, $dest]);
+        if (!$result->success) {
+            throw new RuntimeException("Failed to move: {$result->stderr}");
+        }
+    }
+
+    /**
+     * Delete a file or directory using sudo.
+     */
+    protected function rootDelete(string $path): void
+    {
+        $result = $this->executor->executeAsRoot('rm', ['-rf', $path]);
+        if (!$result->success) {
+            throw new RuntimeException("Failed to delete: {$result->stderr}");
+        }
+    }
+
+    /**
+     * Create directory using sudo.
+     */
+    protected function rootMkdir(string $path, ?string $owner = null): void
+    {
+        $result = $this->executor->executeAsRoot('mkdir', ['-p', $path]);
+        if (!$result->success) {
+            throw new RuntimeException("Failed to create directory: {$result->stderr}");
+        }
+        $this->executor->executeAsRoot('chmod', ['755', $path]);
+        if ($owner) {
+            $this->executor->executeAsRoot('chown', ["{$owner}:{$owner}", $path]);
+        }
+    }
+
+    /**
+     * Get the system username for a domain.
+     */
+    protected function getDomainOwner(Domain $domain): string
+    {
+        return $domain->user->username ?? 'www-data';
     }
 
     // =========================================================================
