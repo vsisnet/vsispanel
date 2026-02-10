@@ -56,6 +56,7 @@
             <div class="flex items-center gap-3">
               <div :class="['w-3 h-3 rounded-full flex-shrink-0',
                 !ver.installed ? 'bg-gray-300 dark:bg-gray-600' :
+                !ver.service_name ? 'bg-green-500' :
                 ver.is_running ? 'bg-green-500' : 'bg-red-400']">
               </div>
               <div>

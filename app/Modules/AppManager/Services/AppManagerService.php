@@ -211,12 +211,28 @@ class AppManagerService
         $versions = [];
         $available = $config['available_versions'] ?? [];
 
-        // Node.js: check binary install directory
+        // Node.js: check binary install directory + system-installed (apt)
         if ($app->slug === 'nodejs') {
             $installDir = $config['install_dir'] ?? '/usr/local/lib/nodejs';
             foreach ($available as $version) {
+                // Check App Manager binary install
                 if (is_dir("{$installDir}/node-{$version}")) {
                     $versions[] = $version;
+                    continue;
+                }
+                // Check versioned symlink (e.g., /usr/local/bin/node22)
+                $binCheck = Process::timeout(5)->run("/usr/local/bin/node{$version} --version 2>/dev/null");
+                if ($binCheck->successful()) {
+                    $versions[] = $version;
+                    continue;
+                }
+                // Check system-installed node (apt) matching this major version
+                $sysCheck = Process::timeout(5)->run("/usr/bin/node --version 2>/dev/null");
+                if ($sysCheck->successful()) {
+                    $major = explode('.', ltrim(trim($sysCheck->output()), 'v'))[0] ?? null;
+                    if ($major === $version) {
+                        $versions[] = $version;
+                    }
                 }
             }
 
@@ -398,9 +414,18 @@ class AppManagerService
             $config = config("appmanager.apps.nodejs", []);
             $installDir = $config['install_dir'] ?? '/usr/local/lib/nodejs';
             $binDir = "{$installDir}/node-{$version}/bin";
-            Process::timeout(5)->run("sudo ln -sf {$binDir}/node /usr/local/bin/node");
-            Process::timeout(5)->run("sudo ln -sf {$binDir}/npm /usr/local/bin/npm");
-            Process::timeout(5)->run("sudo ln -sf {$binDir}/npx /usr/local/bin/npx");
+
+            if (is_dir("{$installDir}/node-{$version}")) {
+                // App Manager binary install
+                Process::timeout(5)->run("sudo ln -sf {$binDir}/node /usr/local/bin/node");
+                Process::timeout(5)->run("sudo ln -sf {$binDir}/npm /usr/local/bin/npm");
+                Process::timeout(5)->run("sudo ln -sf {$binDir}/npx /usr/local/bin/npx");
+            } else {
+                // System-installed (apt), link to /usr/bin binaries
+                Process::timeout(5)->run("sudo ln -sf /usr/bin/node /usr/local/bin/node");
+                Process::timeout(5)->run("sudo ln -sf /usr/bin/npm /usr/local/bin/npm");
+                Process::timeout(5)->run("sudo ln -sf /usr/bin/npx /usr/local/bin/npx");
+            }
         }
 
         if ($app->slug === 'python') {

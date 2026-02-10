@@ -74,13 +74,17 @@
                 <p v-else-if="app.installed_version" class="text-xs text-gray-500 mt-0.5">
                   v{{ app.installed_version }}
                 </p>
-                <!-- Running indicator -->
-                <div v-if="app.status === 'installed'" class="flex items-center gap-1.5 mt-1.5">
+                <!-- Running indicator (only for apps with a service, not runtimes) -->
+                <div v-if="app.status === 'installed' && app.service_name" class="flex items-center gap-1.5 mt-1.5">
                   <div :class="['w-2 h-2 rounded-full', app.is_running ? 'bg-green-500' : 'bg-red-400']"></div>
                   <span :class="['text-xs', app.is_running ? 'text-green-600 dark:text-green-400' : 'text-red-500']">
                     {{ app.is_running ? $t('common.running') : $t('common.stopped') }}
                   </span>
                   <span v-if="app.is_enabled" class="text-xs text-gray-400 ml-1">({{ $t('appManager.autoStart') }})</span>
+                </div>
+                <div v-else-if="app.status === 'installed' && !app.service_name" class="flex items-center gap-1.5 mt-1.5">
+                  <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                  <span class="text-xs text-green-600 dark:text-green-400">{{ $t('appManager.statuses.installed') }}</span>
                 </div>
               </div>
             </div>
