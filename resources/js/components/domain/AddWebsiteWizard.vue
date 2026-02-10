@@ -330,7 +330,10 @@ async function createDomain() {
   try {
     const domain = await domainsStore.createDomain({
       name: form.value.name,
-      php_version: form.value.php_version
+      php_version: form.value.php_version,
+      auto_ssl: form.value.auto_ssl,
+      create_dns: form.value.create_dns,
+      create_database: form.value.create_database,
     })
 
     // Additional options would be handled by the backend

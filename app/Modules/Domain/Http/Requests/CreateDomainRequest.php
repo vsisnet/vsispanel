@@ -38,6 +38,18 @@ class CreateDomainRequest extends FormRequest
                 'sometimes',
                 'boolean',
             ],
+            'auto_ssl' => [
+                'sometimes',
+                'boolean',
+            ],
+            'create_dns' => [
+                'sometimes',
+                'boolean',
+            ],
+            'create_database' => [
+                'sometimes',
+                'boolean',
+            ],
         ];
     }
 

@@ -469,9 +469,9 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const storageRemotes = ref([])
 
-// Only show remotes that have been successfully tested
+// Show all active remotes (tested or not)
 const connectedRemotes = computed(() => {
-  return storageRemotes.value.filter(remote => remote.last_test_result === true)
+  return storageRemotes.value.filter(remote => remote.is_active)
 })
 
 // Icon components as render functions

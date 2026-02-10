@@ -25,6 +25,7 @@ LOG_FILE="${LOG_DIR}/install.log"
 SKIP_MAIL=false
 SKIP_DNS=false
 NON_INTERACTIVE=false
+ADMIN_EMAIL=""
 ADMIN_PASS=""
 
 # Colors
@@ -387,8 +388,9 @@ install_services() {
 
     # Optional: Mail server
     if [[ "$SKIP_MAIL" == false ]]; then
-        log_info "Installing mail services (Postfix, Dovecot)..."
-        apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-pop3d >> "$LOG_FILE" 2>&1 || true
+        log_info "Installing mail services (Postfix, Dovecot, OpenDKIM)..."
+        apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-pop3d \
+            opendkim opendkim-tools >> "$LOG_FILE" 2>&1 || true
         log_ok "Mail services installed"
     else
         log_warn "Skipped mail server installation (--skip-mail)"
@@ -767,9 +769,32 @@ EOSQL
     fi
     log_ok "Migrations complete"
 
-    # Generate random admin password and set in .env
-    ADMIN_PASS=$(openssl rand -base64 12 | tr -d '/+=')
+    # Admin email and password
+    local admin_email="admin@vsispanel.local"
+    local admin_pass=""
+
+    if [[ "$NON_INTERACTIVE" == false ]]; then
+        echo ""
+        read -rp "Admin email [admin@vsispanel.local]: " input_email
+        if [[ -n "$input_email" ]]; then
+            admin_email="$input_email"
+        fi
+
+        read -rp "Admin password (leave blank for random): " input_pass
+        if [[ -n "$input_pass" ]]; then
+            admin_pass="$input_pass"
+        fi
+    fi
+
+    if [[ -z "$admin_pass" ]]; then
+        admin_pass=$(openssl rand -base64 12 | tr -d '/+=')
+    fi
+    ADMIN_PASS="$admin_pass"
+    ADMIN_EMAIL="$admin_email"
+
     sed -i '/^ADMIN_PASSWORD=/d' .env
+    sed -i '/^ADMIN_EMAIL=/d' .env
+    echo "ADMIN_EMAIL=${ADMIN_EMAIL}" >> .env
     echo "ADMIN_PASSWORD=${ADMIN_PASS}" >> .env
 
     # Run seeders (includes roles, admin, plans, alert templates, app templates)
@@ -781,8 +806,9 @@ EOSQL
     fi
     log_ok "Seeding complete"
 
-    # Remove admin password from .env (no longer needed)
+    # Remove admin credentials from .env (no longer needed)
     sed -i '/^ADMIN_PASSWORD=/d' .env
+    sed -i '/^ADMIN_EMAIL=/d' .env
 }
 
 #-----------------------------------------------------------------------------
@@ -1070,7 +1096,7 @@ print_complete() {
     echo ""
     echo -e "  Panel URL:      ${CYAN}https://${server_ip}:8443${NC}"
     echo -e "  phpMyAdmin:     ${CYAN}https://${server_ip}:8443/phpmyadmin${NC}"
-    echo -e "  Admin Email:    ${CYAN}admin@vsispanel.local${NC}"
+    echo -e "  Admin Email:    ${CYAN}${ADMIN_EMAIL:-admin@vsispanel.local}${NC}"
     echo -e "  Admin Password: ${CYAN}${ADMIN_PASS}${NC}"
     echo ""
     echo -e "  ${YELLOW}⚠  Please change the default password after first login!${NC}"

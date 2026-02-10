@@ -69,38 +69,71 @@ class MailSecurityService
         $privateKeyPath = "{$domainKeyDir}/{$selector}.private";
         $txtRecordPath = "{$domainKeyDir}/{$selector}.txt";
 
-        // Generate DKIM key using opendkim-genkey
-        $result = $this->executor->executeAsRoot('opendkim-genkey', [
-            '-b', '2048',
-            '-d', $domain,
-            '-D', $domainKeyDir,
-            '-s', $selector,
-            '-v',
-        ]);
+        // Try opendkim-genkey first, fallback to openssl
+        $checkResult = $this->executor->executeAsRoot('which', ['opendkim-genkey']);
+        $useOpendkim = $checkResult->success && !empty(trim($checkResult->stdout));
 
-        if (!$result->success) {
-            throw new RuntimeException("Failed to generate DKIM key: " . $result->stderr);
+        if ($useOpendkim) {
+            $result = $this->executor->executeAsRoot('opendkim-genkey', [
+                '-b', '2048',
+                '-d', $domain,
+                '-D', $domainKeyDir,
+                '-s', $selector,
+                '-v',
+            ]);
+
+            if (!$result->success) {
+                throw new RuntimeException("Failed to generate DKIM key: " . $result->stderr);
+            }
+
+            // Set correct permissions
+            $this->executor->executeAsRoot('chown', ['-R', 'opendkim:opendkim', $domainKeyDir]);
+            $this->executor->executeAsRoot('chmod', ['600', $privateKeyPath]);
+
+            // Read the generated TXT record
+            $txtContent = File::get($txtRecordPath);
+
+            preg_match('/"([^"]+)"/', $txtContent, $matches);
+            $publicKeyRecord = isset($matches[1])
+                ? str_replace(["\n", "\t", ' '], '', $matches[1])
+                : '';
+
+            preg_match('/p=([^;]+)/', $publicKeyRecord, $keyMatch);
+            $publicKey = $keyMatch[1] ?? '';
+            $privateKey = File::get($privateKeyPath);
+        } else {
+            // Fallback: generate DKIM keys using openssl
+            $this->executor->executeAsRoot('openssl', [
+                'genrsa', '-out', $privateKeyPath, '2048',
+            ]);
+            $this->executor->executeAsRoot('chmod', ['600', $privateKeyPath]);
+
+            // Extract public key
+            $pubResult = $this->executor->executeAsRoot('openssl', [
+                'rsa', '-in', $privateKeyPath, '-pubout', '-outform', 'PEM',
+            ]);
+
+            if (!$pubResult->success) {
+                throw new RuntimeException("Failed to extract DKIM public key: " . $pubResult->stderr);
+            }
+
+            $pubPem = trim($pubResult->stdout);
+            // Remove PEM headers and newlines to get raw base64
+            $publicKey = str_replace([
+                '-----BEGIN PUBLIC KEY-----',
+                '-----END PUBLIC KEY-----',
+                "\n", "\r",
+            ], '', $pubPem);
+
+            $privateKey = File::get($privateKeyPath);
+
+            // Write a TXT record file for reference
+            $txtContent = "{$selector}._domainkey IN TXT \"v=DKIM1; k=rsa; p={$publicKey}\"";
+            File::put($txtRecordPath, $txtContent);
+
+            // Try to set opendkim ownership, ignore if user doesn't exist
+            $this->executor->executeAsRoot('chown', ['-R', 'root:root', $domainKeyDir]);
         }
-
-        // Set correct permissions
-        $this->executor->executeAsRoot('chown', ['-R', 'opendkim:opendkim', $domainKeyDir]);
-        $this->executor->executeAsRoot('chmod', ['600', $privateKeyPath]);
-
-        // Read the generated TXT record
-        $txtContent = File::get($txtRecordPath);
-
-        // Parse the public key from the TXT record
-        preg_match('/"([^"]+)"/', $txtContent, $matches);
-        $publicKeyRecord = isset($matches[1])
-            ? str_replace(["\n", "\t", ' '], '', $matches[1])
-            : '';
-
-        // Extract just the public key (p= value)
-        preg_match('/p=([^;]+)/', $publicKeyRecord, $keyMatch);
-        $publicKey = $keyMatch[1] ?? '';
-
-        // Read private key
-        $privateKey = File::get($privateKeyPath);
 
         // Add to OpenDKIM key table
         $this->addToKeyTable($domain, $selector, $privateKeyPath);

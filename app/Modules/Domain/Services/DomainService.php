@@ -94,6 +94,34 @@ class DomainService
             // Update status to active
             $domain->update(['status' => 'active']);
 
+            // Create DNS zone if requested
+            if (($data['create_dns'] ?? false) && $this->dnsService) {
+                try {
+                    $serverIp = trim(shell_exec('hostname -I') ?: '');
+                    $serverIp = explode(' ', $serverIp)[0] ?? '127.0.0.1';
+                    $this->dnsService->createZone($domain, $serverIp);
+                    Log::channel('commands')->info('DNS zone created for domain', ['domain' => $domainName]);
+                } catch (\Throwable $e) {
+                    Log::channel('commands')->warning('Failed to create DNS zone', [
+                        'domain' => $domainName,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Issue SSL certificate if requested
+            if (($data['auto_ssl'] ?? false) && $this->sslService) {
+                try {
+                    $this->sslService->issueLetsEncrypt($domain);
+                    Log::channel('commands')->info('SSL certificate issued for domain', ['domain' => $domainName]);
+                } catch (\Throwable $e) {
+                    Log::channel('commands')->warning('Failed to issue SSL certificate', [
+                        'domain' => $domainName,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             Log::channel('commands')->info('Domain created', [
                 'domain' => $domainName,
                 'user' => $username,

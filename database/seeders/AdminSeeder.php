@@ -10,12 +10,13 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
+        $email = env('ADMIN_EMAIL', 'admin@vsispanel.local');
         $password = env('ADMIN_PASSWORD', Str::random(16));
 
         $admin = User::create([
             'id' => Str::uuid(),
             'name' => 'Administrator',
-            'email' => 'admin@vsispanel.local',
+            'email' => $email,
             'password' => $password,
             'role' => 'admin',
             'status' => 'active',

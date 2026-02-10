@@ -158,6 +158,11 @@ class SslService
             }
         }
 
+        // Always include the main domain - let certbot validate via HTTP challenge
+        if (empty($validDomains)) {
+            $validDomains[] = $domain->name;
+        }
+
         return $validDomains;
     }
 

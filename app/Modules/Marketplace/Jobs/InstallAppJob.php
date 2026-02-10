@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Marketplace\Jobs;
 
+use App\Modules\Database\Models\ManagedDatabase;
 use App\Modules\Marketplace\Models\AppInstallation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -86,6 +87,41 @@ class InstallAppJob implements ShouldQueue
         }
     }
 
+    /**
+     * Create MySQL database + user and save record to managed_databases table.
+     */
+    private function createDatabaseAndRecord(string $dbName, ?string $dbUser = null, ?string $dbPass = null): array
+    {
+        $dbUser = $dbUser ?? $dbName;
+        $dbPass = $dbPass ?? bin2hex(random_bytes(12));
+
+        $sql = "CREATE DATABASE IF NOT EXISTS \\`{$dbName}\\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; ";
+        $sql .= "CREATE USER IF NOT EXISTS '{$dbUser}'@'localhost' IDENTIFIED BY '{$dbPass}'; ";
+        $sql .= "GRANT ALL PRIVILEGES ON \\`{$dbName}\\`.* TO '{$dbUser}'@'localhost'; FLUSH PRIVILEGES;";
+
+        Process::timeout(30)->run("mysql -u root -e \"{$sql}\"");
+
+        // Save record to managed_databases
+        try {
+            $domain = $this->installation->domain;
+            ManagedDatabase::create([
+                'user_id' => $domain->user_id,
+                'domain_id' => $domain->id,
+                'name' => $dbName,
+                'original_name' => $dbName,
+                'size_bytes' => 0,
+                'charset' => 'utf8mb4',
+                'collation' => 'utf8mb4_unicode_ci',
+                'status' => 'active',
+                'notes' => "Created by Quick Deploy ({$this->installation->app_template_id})",
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to save database record', ['db' => $dbName, 'error' => $e->getMessage()]);
+        }
+
+        return ['name' => $dbName, 'user' => $dbUser, 'pass' => $dbPass];
+    }
+
     private function updateProgress(int $progress, string $step): void
     {
         $this->installation->update([
@@ -119,16 +155,12 @@ class InstallAppJob implements ShouldQueue
 
         $options = $this->installation->options ?? [];
         $dbName = 'wp_' . substr(md5($this->installation->domain_id), 0, 8);
-        $dbUser = $dbName;
-        $dbPass = bin2hex(random_bytes(12));
 
-        // Create database
+        // Create database and save record
         $this->updateProgress(60, 'Creating database...');
-        Process::timeout(30)->run(
-            "mysql -u root -e \"CREATE DATABASE IF NOT EXISTS \`{$dbName}\`; " .
-            "CREATE USER IF NOT EXISTS '{$dbUser}'@'localhost' IDENTIFIED BY '{$dbPass}'; " .
-            "GRANT ALL PRIVILEGES ON \`{$dbName}\`.* TO '{$dbUser}'@'localhost'; FLUSH PRIVILEGES;\""
-        );
+        $db = $this->createDatabaseAndRecord($dbName);
+        $dbUser = $db['user'];
+        $dbPass = $db['pass'];
 
         // Create wp-config.php
         $this->updateProgress(70, 'Creating configuration...');
@@ -183,9 +215,7 @@ class InstallAppJob implements ShouldQueue
 
         $this->updateProgress(80, 'Setting up database...');
         $dbName = 'laravel_' . substr(md5($this->installation->domain_id), 0, 8);
-        Process::timeout(30)->run(
-            "mysql -u root -e \"CREATE DATABASE IF NOT EXISTS \`{$dbName}\`;\""
-        );
+        $this->createDatabaseAndRecord($dbName);
     }
 
     private function installJoomla(string $docRoot): void
@@ -200,9 +230,7 @@ class InstallAppJob implements ShouldQueue
         }
         $this->updateProgress(70, 'Creating database...');
         $dbName = 'joomla_' . substr(md5($this->installation->domain_id), 0, 8);
-        Process::timeout(30)->run(
-            "mysql -u root -e \"CREATE DATABASE IF NOT EXISTS \`{$dbName}\`;\""
-        );
+        $this->createDatabaseAndRecord($dbName);
     }
 
     private function installDrupal(string $docRoot): void
@@ -218,9 +246,7 @@ class InstallAppJob implements ShouldQueue
         }
         $this->updateProgress(70, 'Creating database...');
         $dbName = 'drupal_' . substr(md5($this->installation->domain_id), 0, 8);
-        Process::timeout(30)->run(
-            "mysql -u root -e \"CREATE DATABASE IF NOT EXISTS \`{$dbName}\`;\""
-        );
+        $this->createDatabaseAndRecord($dbName);
     }
 
     private function installPrestaShop(string $docRoot): void
@@ -232,9 +258,7 @@ class InstallAppJob implements ShouldQueue
         );
         $this->updateProgress(70, 'Creating database...');
         $dbName = 'prestashop_' . substr(md5($this->installation->domain_id), 0, 8);
-        Process::timeout(30)->run(
-            "mysql -u root -e \"CREATE DATABASE IF NOT EXISTS \`{$dbName}\`;\""
-        );
+        $this->createDatabaseAndRecord($dbName);
     }
 
     private function installExpress(string $docRoot): void
