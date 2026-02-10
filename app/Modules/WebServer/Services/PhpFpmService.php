@@ -850,10 +850,14 @@ class PhpFpmService
         $tempFile = '/tmp/phpfpm_' . md5($path) . '_' . time() . '.conf';
         file_put_contents($tempFile, $content);
 
-        $this->executor->executeAsRoot('cp', [$tempFile, $path]);
+        $result = $this->executor->executeAsRoot('cp', [$tempFile, $path]);
+        @unlink($tempFile);
+
+        if (!$result->success) {
+            throw new \RuntimeException("Failed to write config to {$path}: {$result->stderr}");
+        }
+
         $this->executor->executeAsRoot('chmod', ['644', $path]);
         $this->executor->executeAsRoot('chown', ['root:root', $path]);
-
-        @unlink($tempFile);
     }
 }

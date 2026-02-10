@@ -962,9 +962,8 @@ async function changeRootPassword() {
 }
 
 function getPhpMyAdminBaseUrl() {
-  // phpMyAdmin runs on port 80, not on the panel port
-  const hostname = window.location.hostname
-  return `http://${hostname}/phpmyadmin`
+  // phpMyAdmin runs on the same Nginx as the panel (port 8443)
+  return `${window.location.origin}/phpmyadmin`
 }
 
 function openPhpMyAdmin() {
