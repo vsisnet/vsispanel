@@ -405,20 +405,21 @@ install_services() {
             chmod 644 /usr/share/phpmyadmin/signon.php
         fi
 
-        # Add Server 2 (signon auth) config for phpMyAdmin
+        # Add signon server config for phpMyAdmin
         mkdir -p /etc/phpmyadmin/conf.d
         cat > /etc/phpmyadmin/conf.d/vsispanel-signon.php << 'PMACONF'
 <?php
-/**
- * VSISPanel phpMyAdmin SSO Server Configuration
- * Server 2: signon auth for auto-login from panel
- */
-$i++;
-$cfg['Servers'][$i]['auth_type'] = 'signon';
-$cfg['Servers'][$i]['SignonSession'] = 'SignonSession';
-$cfg['Servers'][$i]['SignonURL'] = '/phpmyadmin/signon.php';
-$cfg['Servers'][$i]['host'] = 'localhost';
-$cfg['Servers'][$i]['AllowNoPassword'] = false;
+if (empty($cfg['Servers'][1]['auth_type'])) {
+    $cfg['Servers'][1]['auth_type'] = 'cookie';
+    $cfg['Servers'][1]['host'] = 'localhost';
+}
+$signonIdx = max(array_keys($cfg['Servers'] ?? [1 => true])) + 1;
+$cfg['Servers'][$signonIdx]['auth_type'] = 'signon';
+$cfg['Servers'][$signonIdx]['SignonSession'] = 'SignonSession';
+$cfg['Servers'][$signonIdx]['SignonURL'] = '/phpmyadmin/signon.php';
+$cfg['Servers'][$signonIdx]['host'] = 'localhost';
+$cfg['Servers'][$signonIdx]['AllowNoPassword'] = false;
+$cfg['Servers'][$signonIdx]['verbose'] = 'Auto-Login (VSISPanel)';
 PMACONF
         log_ok "phpMyAdmin SSO configured"
     fi

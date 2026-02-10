@@ -9,12 +9,11 @@
 declare(strict_types=1);
 
 // Set session cookie parameters before starting session
-$cookieParams = session_get_cookie_params();
 session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/',
     'domain' => '',
-    'secure' => false,
+    'secure' => isset($_SERVER['HTTPS']),
     'httponly' => true,
     'samesite' => 'Lax'
 ]);
@@ -104,9 +103,45 @@ $_SESSION['PMA_single_signon_port'] = 3306;
 // Force write session before redirect
 session_write_close();
 
-// Build redirect URL - use server=2 for the signon-configured server
-// Server 1 is cookie auth, Server 2 is signon auth
-$redirectUrl = '/phpmyadmin/index.php?server=2';
+// Detect which server index has signon auth
+// Read phpMyAdmin config to find the correct server number
+$signonServer = null;
+$cfg = [];
+$i = 0;
+
+// Load phpMyAdmin config to find server index
+$configFiles = [
+    '/etc/phpmyadmin/config.inc.php',
+    '/usr/share/phpmyadmin/config.inc.php',
+];
+foreach ($configFiles as $configFile) {
+    if (file_exists($configFile)) {
+        // Suppress any output from config loading
+        ob_start();
+        try {
+            include $configFile;
+        } catch (\Throwable $e) {
+            // ignore
+        }
+        ob_end_clean();
+        break;
+    }
+}
+
+// Find server with signon auth
+if (!empty($cfg['Servers'])) {
+    foreach ($cfg['Servers'] as $idx => $server) {
+        if (($server['auth_type'] ?? '') === 'signon') {
+            $signonServer = $idx;
+            break;
+        }
+    }
+}
+
+// Default to server=2 if detection fails
+$serverIdx = $signonServer ?? 2;
+
+$redirectUrl = '/phpmyadmin/index.php?server=' . $serverIdx;
 if (!empty($db)) {
     $redirectUrl .= '&db=' . urlencode($db);
 }
