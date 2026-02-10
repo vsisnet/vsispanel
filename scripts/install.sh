@@ -386,6 +386,43 @@ install_services() {
         fi
     fi
 
+    # Setup phpMyAdmin SSO (Single Sign-On from panel)
+    if [[ -d /usr/share/phpmyadmin ]]; then
+        log_info "Configuring phpMyAdmin SSO..."
+
+        # Generate secret key for SSO token signing
+        local sso_key_file="${INSTALL_DIR}/storage/app/phpmyadmin_secret.key"
+        if [[ ! -f "$sso_key_file" ]]; then
+            openssl rand -hex 32 > "$sso_key_file"
+            chmod 600 "$sso_key_file"
+            chown www-data:www-data "$sso_key_file"
+        fi
+
+        # Deploy signon.php handler
+        if [[ -f "${INSTALL_DIR}/deploy/phpmyadmin/signon.php" ]]; then
+            cp "${INSTALL_DIR}/deploy/phpmyadmin/signon.php" /usr/share/phpmyadmin/signon.php
+            chown root:root /usr/share/phpmyadmin/signon.php
+            chmod 644 /usr/share/phpmyadmin/signon.php
+        fi
+
+        # Add Server 2 (signon auth) config for phpMyAdmin
+        mkdir -p /etc/phpmyadmin/conf.d
+        cat > /etc/phpmyadmin/conf.d/vsispanel-signon.php << 'PMACONF'
+<?php
+/**
+ * VSISPanel phpMyAdmin SSO Server Configuration
+ * Server 2: signon auth for auto-login from panel
+ */
+$i++;
+$cfg['Servers'][$i]['auth_type'] = 'signon';
+$cfg['Servers'][$i]['SignonSession'] = 'SignonSession';
+$cfg['Servers'][$i]['SignonURL'] = '/phpmyadmin/signon.php';
+$cfg['Servers'][$i]['host'] = 'localhost';
+$cfg['Servers'][$i]['AllowNoPassword'] = false;
+PMACONF
+        log_ok "phpMyAdmin SSO configured"
+    fi
+
     # Optional: Mail server
     if [[ "$SKIP_MAIL" == false ]]; then
         log_info "Installing mail services (Postfix, Dovecot, OpenDKIM)..."

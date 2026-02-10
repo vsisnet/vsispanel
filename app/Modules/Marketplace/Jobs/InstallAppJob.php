@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Marketplace\Jobs;
 
+use App\Modules\Database\Models\DatabaseUser;
 use App\Modules\Database\Models\ManagedDatabase;
 use App\Modules\Marketplace\Models\AppInstallation;
 use Illuminate\Bus\Queueable;
@@ -101,10 +102,10 @@ class InstallAppJob implements ShouldQueue
 
         Process::timeout(30)->run("mysql -u root -e \"{$sql}\"");
 
-        // Save record to managed_databases
+        // Save records to managed_databases and database_users
         try {
             $domain = $this->installation->domain;
-            ManagedDatabase::create([
+            $database = ManagedDatabase::create([
                 'user_id' => $domain->user_id,
                 'domain_id' => $domain->id,
                 'name' => $dbName,
@@ -115,8 +116,23 @@ class InstallAppJob implements ShouldQueue
                 'status' => 'active',
                 'notes' => "Created by Quick Deploy ({$this->installation->app_template_id})",
             ]);
+
+            // Create DatabaseUser record with encrypted password (for phpMyAdmin SSO)
+            $dbUserRecord = DatabaseUser::create([
+                'user_id' => $domain->user_id,
+                'username' => $dbUser,
+                'original_username' => $dbUser,
+                'host' => 'localhost',
+                'password_encrypted' => encrypt($dbPass),
+                'privileges' => [],
+            ]);
+
+            // Link user to database via pivot
+            $database->databaseUsers()->attach($dbUserRecord->id, [
+                'privileges' => json_encode(['ALL PRIVILEGES']),
+            ]);
         } catch (\Throwable $e) {
-            Log::warning('Failed to save database record', ['db' => $dbName, 'error' => $e->getMessage()]);
+            Log::warning('Failed to save database/user record', ['db' => $dbName, 'error' => $e->getMessage()]);
         }
 
         return ['name' => $dbName, 'user' => $dbUser, 'pass' => $dbPass];
