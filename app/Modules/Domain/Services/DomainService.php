@@ -7,6 +7,11 @@ namespace App\Modules\Domain\Services;
 use App\Modules\Auth\Models\User;
 use App\Modules\Domain\Models\Domain;
 use App\Modules\Domain\Models\Subdomain;
+use App\Modules\DNS\Models\DnsZone;
+use App\Modules\DNS\Services\PowerDnsService;
+use App\Modules\FTP\Models\FtpAccount;
+use App\Modules\SSL\Models\SslCertificate;
+use App\Modules\SSL\Services\SslService;
 use App\Modules\WebServer\Services\NginxService;
 use App\Modules\WebServer\Services\PhpFpmService;
 use App\Services\SystemCommandExecutor;
@@ -19,7 +24,9 @@ class DomainService
     public function __construct(
         protected SystemCommandExecutor $executor,
         protected ?NginxService $nginxService = null,
-        protected ?PhpFpmService $phpFpmService = null
+        protected ?PhpFpmService $phpFpmService = null,
+        protected ?SslService $sslService = null,
+        protected ?PowerDnsService $dnsService = null
     ) {}
 
     /**
@@ -145,7 +152,7 @@ class DomainService
             if ($this->nginxService && $domain->web_server_type === 'nginx') {
                 try {
                     $this->nginxService->deleteVhost($domain);
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::channel('commands')->warning('Failed to delete Nginx vhost', [
                         'domain' => $domain->name,
                         'error' => $e->getMessage(),
@@ -157,13 +164,22 @@ class DomainService
             if ($this->phpFpmService) {
                 try {
                     $this->phpFpmService->deleteDomainPool($domain);
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::channel('commands')->warning('Failed to delete PHP-FPM pool', [
                         'domain' => $domain->name,
                         'error' => $e->getMessage(),
                     ]);
                 }
             }
+
+            // Revoke and clean up SSL certificate
+            $this->cleanupSslCertificate($domain);
+
+            // Delete DNS zone
+            $this->cleanupDnsZone($domain);
+
+            // Delete FTP accounts for this domain
+            $this->cleanupFtpAccounts($domain);
 
             // Archive document root (move to trash)
             $this->archiveDomainDirectory($domain, $username);
@@ -189,17 +205,38 @@ class DomainService
         DB::transaction(function () use ($domain) {
             $username = $this->getUsername($domain->user);
 
+            // Remove Nginx vhost
+            if ($this->nginxService && $domain->web_server_type === 'nginx') {
+                try {
+                    $this->nginxService->deleteVhost($domain);
+                } catch (\Throwable $e) {
+                    Log::channel('commands')->warning('Failed to delete Nginx vhost', [
+                        'domain' => $domain->name,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Delete PHP-FPM pool
             if ($this->phpFpmService) {
                 try {
                     $this->phpFpmService->deleteDomainPool($domain);
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::channel('commands')->warning('Failed to delete PHP-FPM pool', [
                         'domain' => $domain->name,
                         'error' => $e->getMessage(),
                     ]);
                 }
             }
+
+            // Revoke and clean up SSL certificate
+            $this->cleanupSslCertificate($domain);
+
+            // Delete DNS zone
+            $this->cleanupDnsZone($domain);
+
+            // Delete FTP accounts for this domain
+            $this->cleanupFtpAccounts($domain);
 
             // Remove directory permanently
             $domainPath = "/home/{$username}/domains/{$domain->name}";
@@ -445,6 +482,100 @@ HTML;
         $this->executor->executeAsRoot('chmod', ['644', $indexPath]);
 
         unlink($tempFile);
+    }
+
+    /**
+     * Clean up SSL certificate for a domain.
+     */
+    protected function cleanupSslCertificate(Domain $domain): void
+    {
+        try {
+            $certificate = $domain->sslCertificate;
+            if (!$certificate) {
+                return;
+            }
+
+            if ($this->sslService) {
+                $this->sslService->revokeCertificate($certificate);
+            }
+
+            // Delete certbot files
+            $certbotLivePath = "/etc/letsencrypt/live/{$domain->name}";
+            $certbotRenewalPath = "/etc/letsencrypt/renewal/{$domain->name}.conf";
+            $certbotArchivePath = "/etc/letsencrypt/archive/{$domain->name}";
+
+            $this->executor->executeAsRoot('rm', ['-rf', $certbotLivePath]);
+            $this->executor->executeAsRoot('rm', ['-f', $certbotRenewalPath]);
+            $this->executor->executeAsRoot('rm', ['-rf', $certbotArchivePath]);
+
+            $certificate->delete();
+
+            Log::channel('commands')->info('SSL certificate cleaned up', [
+                'domain' => $domain->name,
+            ]);
+        } catch (\Throwable $e) {
+            Log::channel('commands')->warning('Failed to clean up SSL certificate', [
+                'domain' => $domain->name,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Clean up DNS zone for a domain.
+     */
+    protected function cleanupDnsZone(Domain $domain): void
+    {
+        try {
+            $zone = $domain->dnsZone;
+            if (!$zone) {
+                return;
+            }
+
+            if ($this->dnsService) {
+                $this->dnsService->deleteZone($zone);
+            } else {
+                // Fallback: delete records and zone from DB
+                $zone->records()->delete();
+                $zone->delete();
+            }
+
+            Log::channel('commands')->info('DNS zone cleaned up', [
+                'domain' => $domain->name,
+            ]);
+        } catch (\Throwable $e) {
+            Log::channel('commands')->warning('Failed to clean up DNS zone', [
+                'domain' => $domain->name,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Clean up FTP accounts for a domain.
+     */
+    protected function cleanupFtpAccounts(Domain $domain): void
+    {
+        try {
+            $ftpAccounts = FtpAccount::where('domain_id', $domain->id)->get();
+            if ($ftpAccounts->isEmpty()) {
+                return;
+            }
+
+            foreach ($ftpAccounts as $account) {
+                $account->delete();
+            }
+
+            Log::channel('commands')->info('FTP accounts cleaned up', [
+                'domain' => $domain->name,
+                'count' => $ftpAccounts->count(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::channel('commands')->warning('Failed to clean up FTP accounts', [
+                'domain' => $domain->name,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
