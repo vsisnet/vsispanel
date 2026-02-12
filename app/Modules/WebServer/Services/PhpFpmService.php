@@ -104,7 +104,7 @@ class PhpFpmService
         $this->writeConfig($poolPath, $content);
 
         // Restart PHP-FPM service
-        $this->restartService($phpVersion);
+        $this->reloadService($phpVersion);
 
         Log::channel('commands')->info('PHP-FPM pool created', [
             'username' => $username,
@@ -137,7 +137,7 @@ class PhpFpmService
         $this->executor->executeAsRoot('mv', [$poolPath, $backupPath]);
 
         // Restart PHP-FPM service
-        $this->restartService($phpVersion);
+        $this->reloadService($phpVersion);
 
         Log::channel('commands')->info('PHP-FPM pool deleted', [
             'username' => $username,
@@ -171,7 +171,7 @@ class PhpFpmService
         $this->writeConfig($poolPath, $content);
 
         // Restart PHP-FPM service
-        $this->restartService($phpVersion);
+        $this->reloadService($phpVersion);
 
         Log::channel('commands')->info('PHP-FPM pool updated', [
             'username' => $username,
@@ -324,7 +324,7 @@ class PhpFpmService
         $this->writeConfig($iniPath, $content);
 
         // Restart PHP-FPM
-        $this->restartService($version);
+        $this->reloadService($version);
 
         Log::channel('commands')->info('PHP.ini settings updated', [
             'username' => $username,
@@ -400,7 +400,7 @@ class PhpFpmService
         $this->writeConfig($poolPath, $content);
 
         // Restart PHP-FPM service
-        $this->restartService($phpVersion);
+        $this->reloadService($phpVersion);
 
         Log::channel('commands')->info('PHP-FPM domain pool created', [
             'domain' => $domain->name,
@@ -435,7 +435,7 @@ class PhpFpmService
         $this->executor->executeAsRoot('mv', [$poolPath, $backupPath]);
 
         // Restart PHP-FPM service
-        $this->restartService($phpVersion);
+        $this->reloadService($phpVersion);
 
         Log::channel('commands')->info('PHP-FPM domain pool deleted', [
             'domain' => $domain->name,
@@ -540,7 +540,7 @@ class PhpFpmService
         $this->writeConfig($poolPath, $content);
 
         // Restart PHP-FPM service
-        $this->restartService($phpVersion);
+        $this->reloadService($phpVersion);
 
         Log::channel('commands')->info('Domain PHP settings updated', [
             'domain' => $domain->name,
