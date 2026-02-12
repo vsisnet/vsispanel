@@ -754,7 +754,13 @@ class PhpFpmService
     public function reloadService(string $phpVersion): CommandResult
     {
         $serviceName = "php{$phpVersion}-fpm";
-        return $this->executor->executeAsRoot('systemctl', ['reload', $serviceName]);
+
+        // Use reload-or-restart to handle new pool configs
+        // Run in background to avoid killing the current PHP-FPM worker handling this request
+        return $this->executor->executeAsRoot('bash', [
+            '-c',
+            "sleep 1 && systemctl reload {$serviceName} &"
+        ]);
     }
 
     /**
