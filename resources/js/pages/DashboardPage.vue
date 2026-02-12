@@ -520,9 +520,9 @@ function getActivityIcon(event) {
 // Quick actions
 const quickActions = computed(() => {
   const actions = [
-    { name: 'addWebsite', label: 'dashboard.addWebsite', icon: PlusIcon, route: '/websites/create' },
-    { name: 'createDatabase', label: 'dashboard.createDatabase', icon: CircleStackIcon, route: '/databases/create' },
-    { name: 'addEmail', label: 'dashboard.addEmail', icon: EnvelopeIcon, route: '/email/create' },
+    { name: 'addWebsite', label: 'dashboard.addWebsite', icon: PlusIcon, route: '/websites' },
+    { name: 'createDatabase', label: 'dashboard.createDatabase', icon: CircleStackIcon, route: '/databases' },
+    { name: 'addEmail', label: 'dashboard.addEmail', icon: EnvelopeIcon, route: '/email' },
     { name: 'fileManager', label: 'dashboard.fileManager', icon: ServerIcon, route: '/files' },
     { name: 'createBackup', label: 'dashboard.createBackup', icon: CloudArrowUpIcon, route: '/backup' },
     { name: 'sslCertificate', label: 'dashboard.sslCertificate', icon: CheckCircleIcon, route: '/ssl' },

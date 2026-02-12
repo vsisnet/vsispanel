@@ -196,7 +196,8 @@ const navigationGroups = [
       { name: 'cron', route: 'cron', label: 'nav.cronJobs', icon: ClockIcon, permission: 'cron.view' },
       { name: 'terminal', route: 'terminal', label: 'nav.terminal', icon: CommandLineIcon, permission: 'terminal.access' },
       { name: 'marketplace', route: 'marketplace', label: 'nav.marketplace', icon: RocketLaunchIcon },
-      { name: 'tasks', route: 'tasks', label: 'nav.tasks', icon: ClipboardDocumentListIcon, permission: 'tasks.view' }
+      { name: 'tasks', route: 'tasks', label: 'nav.tasks', icon: ClipboardDocumentListIcon, permission: 'tasks.view' },
+      { name: 'migration', route: 'migration', label: 'nav.migration', icon: ArrowsRightLeftIcon, permission: 'server.manage' }
     ]
   },
   {
@@ -206,7 +207,6 @@ const navigationGroups = [
       { name: 'users', route: 'users', label: 'nav.users', icon: UsersIcon, permission: 'users.view' },
       { name: 'hosting', route: 'hosting', label: 'nav.hosting', icon: CubeIcon, permission: 'hosting.view' },
       { name: 'reseller', route: 'reseller', label: 'nav.reseller', icon: BuildingOffice2Icon, permission: 'reseller.view' },
-      { name: 'migration', route: 'migration', label: 'nav.migration', icon: ArrowsRightLeftIcon },
       { name: 'settings', route: 'settings', label: 'nav.settings', icon: Cog6ToothIcon }
     ]
   }
