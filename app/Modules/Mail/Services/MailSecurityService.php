@@ -91,7 +91,8 @@ class MailSecurityService
             $this->executor->executeAsRoot('chmod', ['600', $privateKeyPath]);
 
             // Read the generated TXT record
-            $txtContent = File::get($txtRecordPath);
+            $txtResult = $this->executor->executeAsRoot("cat", [$txtRecordPath]);
+            $txtContent = $txtResult->success ? $txtResult->stdout : "";
 
             preg_match('/"([^"]+)"/', $txtContent, $matches);
             $publicKeyRecord = isset($matches[1])
@@ -100,7 +101,8 @@ class MailSecurityService
 
             preg_match('/p=([^;]+)/', $publicKeyRecord, $keyMatch);
             $publicKey = $keyMatch[1] ?? '';
-            $privateKey = File::get($privateKeyPath);
+            $privResult = $this->executor->executeAsRoot("cat", [$privateKeyPath]);
+            $privateKey = $privResult->success ? trim($privResult->stdout) : "";
         } else {
             // Fallback: generate DKIM keys using openssl
             $this->executor->executeAsRoot('openssl', [
@@ -125,11 +127,12 @@ class MailSecurityService
                 "\n", "\r",
             ], '', $pubPem);
 
-            $privateKey = File::get($privateKeyPath);
+            $privResult = $this->executor->executeAsRoot("cat", [$privateKeyPath]);
+            $privateKey = $privResult->success ? trim($privResult->stdout) : "";
 
             // Write a TXT record file for reference
             $txtContent = "{$selector}._domainkey IN TXT \"v=DKIM1; k=rsa; p={$publicKey}\"";
-            File::put($txtRecordPath, $txtContent);
+            $this->executor->executeAsRoot('bash', ['-c', 'echo ' . escapeshellarg($txtContent) . ' > ' . escapeshellarg($txtRecordPath)]);
 
             // Try to set opendkim ownership, ignore if user doesn't exist
             $this->executor->executeAsRoot('chown', ['-R', 'root:root', $domainKeyDir]);
@@ -170,7 +173,8 @@ class MailSecurityService
         }
 
         // Read the TXT record file
-        $txtContent = File::exists($txtRecordPath) ? File::get($txtRecordPath) : '';
+        $txtResult2 = $this->executor->executeAsRoot('cat', [$txtRecordPath]);
+        $txtContent = $txtResult2->success ? $txtResult2->stdout : '';
         preg_match('/p=([^;"\s]+)/', $txtContent, $keyMatch);
         $publicKey = $keyMatch[1] ?? '';
 
@@ -393,9 +397,10 @@ class MailSecurityService
         $entry = "{$selector}._domainkey.{$domain} {$domain}:{$selector}:{$keyPath}";
 
         // Check if already exists
-        $content = File::get($keyTableFile);
+        $readResult = $this->executor->executeAsRoot('cat', [$keyTableFile]);
+        $content = $readResult->success ? $readResult->stdout : '';
         if (!str_contains($content, "{$selector}._domainkey.{$domain}")) {
-            File::append($keyTableFile, $entry . "\n");
+            $this->executor->executeAsRoot('bash', ['-c', "echo " . escapeshellarg($entry) . " >> " . escapeshellarg($keyTableFile)]);
         }
     }
 
@@ -409,10 +414,11 @@ class MailSecurityService
             return;
         }
 
-        $content = File::get($keyTableFile);
+        $readResult = $this->executor->executeAsRoot('cat', [$keyTableFile]);
+        $content = $readResult->success ? $readResult->stdout : '';
         $lines = explode("\n", $content);
         $filtered = array_filter($lines, fn($line) => !str_contains($line, $domain));
-        File::put($keyTableFile, implode("\n", $filtered));
+        $this->executor->executeAsRoot('bash', ['-c', 'echo ' . escapeshellarg(implode("\n", $filtered)) . ' > ' . escapeshellarg($keyTableFile)]);
     }
 
     /**
@@ -427,9 +433,10 @@ class MailSecurityService
         $entry = "*@{$domain} {$selector}._domainkey.{$domain}";
 
         // Check if already exists
-        $content = File::get($signingTableFile);
+        $readResult = $this->executor->executeAsRoot('cat', [$signingTableFile]);
+        $content = $readResult->success ? $readResult->stdout : '';
         if (!str_contains($content, "*@{$domain}")) {
-            File::append($signingTableFile, $entry . "\n");
+            $this->executor->executeAsRoot('bash', ['-c', "echo " . escapeshellarg($entry) . " >> " . escapeshellarg($signingTableFile)]);
         }
     }
 
@@ -443,10 +450,11 @@ class MailSecurityService
             return;
         }
 
-        $content = File::get($signingTableFile);
+        $readResult = $this->executor->executeAsRoot('cat', [$signingTableFile]);
+        $content = $readResult->success ? $readResult->stdout : '';
         $lines = explode("\n", $content);
         $filtered = array_filter($lines, fn($line) => !str_contains($line, "@{$domain}"));
-        File::put($signingTableFile, implode("\n", $filtered));
+        $this->executor->executeAsRoot('bash', ['-c', 'echo ' . escapeshellarg(implode("\n", $filtered)) . ' > ' . escapeshellarg($signingTableFile)]);
     }
 
     /**
@@ -463,7 +471,7 @@ class MailSecurityService
     protected function ensureFileExists(string $file): void
     {
         if (!File::exists($file)) {
-            File::put($file, '');
+            $this->executor->executeAsRoot('touch', [$file]);
             $this->executor->executeAsRoot('chown', ['opendkim:opendkim', $file]);
             $this->executor->executeAsRoot('chmod', ['640', $file]);
         }
