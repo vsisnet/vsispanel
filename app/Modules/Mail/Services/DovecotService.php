@@ -329,7 +329,7 @@ class DovecotService
      */
     public function hashPassword(string $password): string
     {
-        $result = $this->executor->execute('doveadm', ['pw', '-s', 'SSHA512', '-p', $password]);
+        $result = $this->executor->executeAsRoot('/usr/bin/doveadm', ['pw', '-s', 'SSHA512', '-p', $password]);
 
         if (!$result->success) {
             throw new RuntimeException("Failed to hash password: " . $result->stderr);
