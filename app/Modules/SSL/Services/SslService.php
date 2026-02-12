@@ -268,26 +268,21 @@ class SslService
         $certInfo = $this->parseCertificateString($certificate);
         $this->validateCertificateDomain($certInfo, $domain->name);
 
-        // Create directory for certificate files
+        // Create directory for certificate files (as root since /etc/vsispanel/ssl/ is root-owned)
         $sslDir = config('vsispanel.ssl.custom_cert_path', '/etc/vsispanel/ssl') . '/' . $domain->name;
-        if (!File::isDirectory($sslDir)) {
-            File::makeDirectory($sslDir, 0700, true);
-        }
+        $this->executor->executeAsRoot('mkdir', ['-p', $sslDir]);
+        $this->executor->executeAsRoot('chmod', ['0700', $sslDir]);
 
-        // Save certificate files
+        // Save certificate files via temp files + root copy
         $certPath = $sslDir . '/certificate.pem';
         $keyPath = $sslDir . '/private.key';
         $caPath = $caBundle ? $sslDir . '/ca-bundle.pem' : null;
 
-        File::put($certPath, $certificate);
-        File::chmod($certPath, 0644);
-
-        File::put($keyPath, $privateKey);
-        File::chmod($keyPath, 0600);
+        $this->writeFileAsRoot($certPath, $certificate, '0644');
+        $this->writeFileAsRoot($keyPath, $privateKey, '0600');
 
         if ($caBundle) {
-            File::put($caPath, $caBundle);
-            File::chmod($caPath, 0644);
+            $this->writeFileAsRoot($caPath, $caBundle, '0644');
         }
 
         // Deactivate any existing certificate
@@ -523,15 +518,43 @@ class SslService
     }
 
 
+
+    /**
+     * Write content to a file as root using a temp file.
+     */
+    protected function writeFileAsRoot(string $path, string $content, string $mode = '0644'): void
+    {
+        $tmpFile = tempnam(sys_get_temp_dir(), 'ssl_');
+        file_put_contents($tmpFile, $content);
+        $this->executor->executeAsRoot('cp', [$tmpFile, $path]);
+        $this->executor->executeAsRoot('chmod', [$mode, $path]);
+        @unlink($tmpFile);
+    }
+
     /**
      * Create a full chain file from certificate and CA bundle.
      */
     protected function createFullChain(string $certPath, string $caPath): string
     {
         $fullChainPath = dirname($certPath) . '/fullchain.pem';
-        $content = File::get($certPath) . "\n" . File::get($caPath);
-        File::put($fullChainPath, $content);
-        File::chmod($fullChainPath, 0644);
+
+        // Read cert files as root (may be in root-owned directories like /etc/vsispanel/ssl/)
+        $certResult = $this->executor->executeAsRoot('cat', [$certPath]);
+        $caResult = $this->executor->executeAsRoot('cat', [$caPath]);
+
+        if (!$certResult->success || !$caResult->success) {
+            throw new RuntimeException("Cannot read certificate files for full chain creation.");
+        }
+
+        $chainContent = $certResult->stdout . "\n" . $caResult->stdout;
+
+        // Write full chain file as root
+        $tmpFile = tempnam(sys_get_temp_dir(), 'ssl_');
+        file_put_contents($tmpFile, $chainContent);
+        $this->executor->executeAsRoot('cp', [$tmpFile, $fullChainPath]);
+        $this->executor->executeAsRoot('chmod', ['0644', $fullChainPath]);
+        @unlink($tmpFile);
+
         return $fullChainPath;
     }
 
