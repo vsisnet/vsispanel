@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Auth\Http\Controllers\ApiTokenController;
 use App\Modules\Auth\Http\Controllers\ForgotPasswordController;
 use App\Modules\Auth\Http\Controllers\LoginController;
 use App\Modules\Auth\Http\Controllers\ProfileController;
@@ -36,6 +37,13 @@ Route::prefix('auth')->group(function () {
             Route::post('enable', [TwoFactorController::class, 'enable']);
             Route::post('confirm', [TwoFactorController::class, 'confirm']);
             Route::post('disable', [TwoFactorController::class, 'disable']);
+        });
+
+        // API Tokens
+        Route::prefix('api-tokens')->group(function () {
+            Route::get('/', [ApiTokenController::class, 'index']);
+            Route::post('/', [ApiTokenController::class, 'store']);
+            Route::delete('/{id}', [ApiTokenController::class, 'destroy']);
         });
     });
 });

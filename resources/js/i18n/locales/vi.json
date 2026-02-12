@@ -43,7 +43,8 @@
     "remove": "Xóa",
     "showingOf": "Hiển thị {from} đến {to} trong {total}",
     "browse": "Duyệt",
-    "select": "Chọn"
+    "select": "Chọn",
+    "done": "Xong"
   },
   "sidebar": {
     "expand": "Mở rộng sidebar",
@@ -2005,7 +2006,8 @@
     "tabs": {
       "general": "Chung",
       "notifications": "Thông báo",
-      "ssl": "SSL"
+      "ssl": "SSL",
+      "api-tokens": "API Token"
     },
     "ssl": {
       "title": "Cấu hình Let's Encrypt",
@@ -2239,5 +2241,27 @@
       "failed": "Thất bại",
       "cancelled": "Đã hủy"
     }
+  },
+  "apiTokens": {
+    "title": "API Token",
+    "description": "Quản lý API token cho tích hợp bên ngoài và tự động hóa.",
+    "create": "Tạo Token",
+    "name": "Tên Token",
+    "namePlaceholder": "VD: CI/CD Pipeline, Script Giám sát",
+    "permissions": "Quyền hạn",
+    "lastUsed": "Sử dụng lần cuối",
+    "created": "Ngày tạo",
+    "delete": "Xóa Token",
+    "deleteConfirm": "Bạn có chắc muốn thu hồi token \"{name}\"? Các ứng dụng sử dụng token này sẽ mất quyền truy cập.",
+    "deleted": "Đã thu hồi token thành công.",
+    "newToken": "API Token Mới",
+    "copyWarning": "Token này chỉ hiển thị một lần. Hãy sao chép và lưu trữ an toàn.",
+    "copied": "Đã sao chép token.",
+    "expiry": "Ngày hết hạn",
+    "noExpiry": "Để trống nếu không muốn hết hạn.",
+    "allPermissions": "Tất cả quyền",
+    "selectPermissions": "Chọn quyền hạn",
+    "noTokens": "Chưa có API token. Tạo một token để bắt đầu.",
+    "never": "Chưa bao giờ"
   }
 }

@@ -43,7 +43,8 @@
     "stopped": "Stopped",
     "perPage": "Per page",
     "remove": "Remove",
-    "showingOf": "Showing {from} to {to} of {total}"
+    "showingOf": "Showing {from} to {to} of {total}",
+    "done": "Done"
   },
   "sidebar": {
     "expand": "Expand sidebar",
@@ -2005,7 +2006,8 @@
     "tabs": {
       "general": "General",
       "notifications": "Notifications",
-      "ssl": "SSL"
+      "ssl": "SSL",
+      "api-tokens": "API Tokens"
     },
     "ssl": {
       "title": "Let's Encrypt Configuration",
@@ -2239,5 +2241,27 @@
       "failed": "Failed",
       "cancelled": "Cancelled"
     }
+  },
+  "apiTokens": {
+    "title": "API Tokens",
+    "description": "Manage API tokens for external integrations and automation.",
+    "create": "Create Token",
+    "name": "Token Name",
+    "namePlaceholder": "e.g. CI/CD Pipeline, Monitoring Script",
+    "permissions": "Permissions",
+    "lastUsed": "Last Used",
+    "created": "Created",
+    "delete": "Delete Token",
+    "deleteConfirm": "Are you sure you want to revoke the token \"{name}\"? Any applications using this token will lose access.",
+    "deleted": "Token revoked successfully.",
+    "newToken": "New API Token",
+    "copyWarning": "This token will only be shown once. Copy it now and store it securely.",
+    "copied": "Token copied to clipboard.",
+    "expiry": "Expiry Date",
+    "noExpiry": "Leave empty for no expiration.",
+    "allPermissions": "All Permissions",
+    "selectPermissions": "Select Permissions",
+    "noTokens": "No API tokens yet. Create one to get started.",
+    "never": "Never"
   }
 }
