@@ -48,6 +48,24 @@ class BackupJob implements ShouldQueue
             }
         }
 
+        try {
+            $this->executeBackup($backupService, $rcloneService);
+        } catch (\Throwable $e) {
+            Log::error('BackupJob unexpected exception', [
+                'backup_id' => $this->backup->id,
+                'task_id' => $this->taskId,
+                'error' => $e->getMessage(),
+            ]);
+            $this->backup->markAsFailed($e->getMessage());
+            $this->failTask('Unexpected error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Execute the actual backup logic
+     */
+    protected function executeBackup(BackupService $backupService, RcloneService $rcloneService): void
+    {
         Log::info('Starting backup job', [
             'backup_id' => $this->backup->id,
             'type' => $this->backup->type,

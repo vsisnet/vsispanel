@@ -34,3 +34,9 @@ Schedule::job(new \App\Modules\Monitoring\Jobs\CollectMetricsJob())
 Schedule::job(new \App\Modules\Monitoring\Jobs\CleanupOldMetrics())
     ->daily()
     ->at('03:00');
+
+// Auto-fail stuck tasks and backups every 15 minutes
+Schedule::command('task:cleanup-stuck --hours=2')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/task-cleanup.log'));

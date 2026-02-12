@@ -59,6 +59,10 @@ class RunScheduledBackups extends Command
                     'backup_config_id' => $config->id,
                     'config_name' => $config->name,
                 ]);
+
+                // Still update next_run_at so scheduler doesn't keep retrying every minute
+                $config->updateNextRunAt();
+
                 $skipped++;
                 continue;
             }
