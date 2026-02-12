@@ -143,6 +143,7 @@ import {
   Squares2X2Icon,
   BellAlertIcon,
   RocketLaunchIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
@@ -205,6 +206,7 @@ const navigationGroups = [
       { name: 'users', route: 'users', label: 'nav.users', icon: UsersIcon, permission: 'users.view' },
       { name: 'hosting', route: 'hosting', label: 'nav.hosting', icon: CubeIcon, permission: 'hosting.view' },
       { name: 'reseller', route: 'reseller', label: 'nav.reseller', icon: BuildingOffice2Icon, permission: 'reseller.view' },
+      { name: 'migration', route: 'migration', label: 'nav.migration', icon: ArrowsRightLeftIcon },
       { name: 'settings', route: 'settings', label: 'nav.settings', icon: Cog6ToothIcon }
     ]
   }

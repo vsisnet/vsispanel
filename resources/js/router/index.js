@@ -33,6 +33,7 @@ const ProfilePage = () => import('@/pages/ProfilePage.vue')
 const NotFoundPage = () => import('@/pages/NotFoundPage.vue')
 const SetupWizardPage = () => import('@/pages/SetupWizardPage.vue')
 const AboutPage = () => import('@/pages/AboutPage.vue')
+const MigrationPage = () => import('@/pages/MigrationPage.vue')
 
 const routes = [
   // Setup wizard (before installation)
@@ -227,6 +228,14 @@ const routes = [
     name: 'profile',
     component: ProfilePage,
     meta: { requiresAuth: true, title: 'nav.profile' }
+  },
+
+  // Migration
+  {
+    path: '/migration',
+    name: 'migration',
+    component: MigrationPage,
+    meta: { requiresAuth: true, title: 'migration.title' }
   },
 
   // About

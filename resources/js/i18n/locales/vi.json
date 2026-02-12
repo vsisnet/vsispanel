@@ -85,7 +85,8 @@
     "reseller": "Đại lý",
     "marketplace": "Cài nhanh",
     "alerts": "Cảnh báo",
-    "appManager": "Quản lý ứng dụng"
+    "appManager": "Quản lý ứng dụng",
+    "migration": "Di chuyển"
   },
   "navGroups": {
     "main": "CHÍNH",
@@ -2149,6 +2150,55 @@
       "errorTitle": "Cài đặt thất bại",
       "retry": "Thử lại cài đặt",
       "installFailed": "Cài đặt thất bại. Vui lòng kiểm tra nhật ký và thử lại."
+    }
+  },
+  "migration": {
+    "title": "Di chuyển Server",
+    "description": "Nhập tài khoản từ panel khác (Plesk, cPanel, aaPanel, DirectAdmin) hoặc qua SSH",
+    "selectSource": "Chọn nguồn",
+    "connectionDetails": "Thông tin kết nối",
+    "hostname": "Tên máy chủ / IP",
+    "port": "Cổng",
+    "username": "Tên đăng nhập",
+    "authMethod": "Phương thức xác thực",
+    "password": "Mật khẩu",
+    "privateKey": "Khóa riêng (Private Key)",
+    "testing": "Đang kiểm tra...",
+    "testAndDiscover": "Kiểm tra & Khám phá",
+    "discoveredResources": "Tài nguyên được tìm thấy",
+    "detectedServerType": "Loại server phát hiện",
+    "domains": "Tên miền",
+    "databases": "Cơ sở dữ liệu",
+    "cronJobs": "Tác vụ định kỳ",
+    "migrateCrons": "Di chuyển tác vụ định kỳ",
+    "options": "Tùy chọn",
+    "migrateFiles": "Di chuyển tệp tin",
+    "issueSsl": "Cấp chứng chỉ SSL (Let's Encrypt)",
+    "reviewStart": "Xem lại & Bắt đầu",
+    "reviewSummary": "Tóm tắt di chuyển",
+    "sourceType": "Loại nguồn",
+    "sourceHost": "Máy chủ nguồn",
+    "startMigration": "Bắt đầu di chuyển",
+    "starting": "Đang bắt đầu...",
+    "migrationProgress": "Tiến trình di chuyển",
+    "progress": "Tiến trình",
+    "cancel": "Hủy",
+    "newMigration": "Di chuyển mới",
+    "history": "Lịch sử di chuyển",
+    "noJobs": "Chưa có lịch sử di chuyển",
+    "confirmDelete": "Bạn có chắc muốn xóa bản ghi di chuyển này?",
+    "waitingForLogs": "Đang chờ nhật ký...",
+    "stepSource": "Chọn nguồn",
+    "stepConnection": "Kết nối",
+    "stepDiscover": "Khám phá",
+    "stepReview": "Xem lại",
+    "stepProgress": "Tiến trình",
+    "statuses": {
+      "pending": "Chờ xử lý",
+      "running": "Đang chạy",
+      "completed": "Hoàn tất",
+      "failed": "Thất bại",
+      "cancelled": "Đã hủy"
     }
   }
 }

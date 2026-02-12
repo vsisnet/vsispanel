@@ -87,7 +87,8 @@
     "reseller": "Reseller",
     "marketplace": "Quick Deploy",
     "alerts": "Alerts",
-    "appManager": "App Manager"
+    "appManager": "App Manager",
+    "migration": "Migration"
   },
   "navGroups": {
     "main": "MAIN",
@@ -2165,6 +2166,55 @@
       "errorTitle": "Installation Failed",
       "retry": "Retry Installation",
       "installFailed": "Installation failed. Please check the logs and try again."
+    }
+  },
+  "migration": {
+    "title": "Server Migration",
+    "description": "Import accounts from other panels (Plesk, cPanel, aaPanel, DirectAdmin) or via SSH",
+    "selectSource": "Select Source",
+    "connectionDetails": "Connection Details",
+    "hostname": "Hostname / IP",
+    "port": "Port",
+    "username": "Username",
+    "authMethod": "Authentication Method",
+    "password": "Password",
+    "privateKey": "Private Key",
+    "testing": "Testing...",
+    "testAndDiscover": "Test & Discover",
+    "discoveredResources": "Discovered Resources",
+    "detectedServerType": "Detected server type",
+    "domains": "Domains",
+    "databases": "Databases",
+    "cronJobs": "Cron Jobs",
+    "migrateCrons": "Migrate cron jobs",
+    "options": "Options",
+    "migrateFiles": "Migrate files",
+    "issueSsl": "Issue SSL certificates (Let's Encrypt)",
+    "reviewStart": "Review & Start",
+    "reviewSummary": "Migration Summary",
+    "sourceType": "Source Type",
+    "sourceHost": "Source Host",
+    "startMigration": "Start Migration",
+    "starting": "Starting...",
+    "migrationProgress": "Migration Progress",
+    "progress": "Progress",
+    "cancel": "Cancel",
+    "newMigration": "New Migration",
+    "history": "Migration History",
+    "noJobs": "No migration history",
+    "confirmDelete": "Are you sure you want to delete this migration record?",
+    "waitingForLogs": "Waiting for logs...",
+    "stepSource": "Source",
+    "stepConnection": "Connection",
+    "stepDiscover": "Discover",
+    "stepReview": "Review",
+    "stepProgress": "Progress",
+    "statuses": {
+      "pending": "Pending",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
     }
   }
 }
