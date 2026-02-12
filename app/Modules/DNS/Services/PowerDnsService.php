@@ -392,7 +392,7 @@ class PowerDnsService
         $payload = [
             'name' => $zoneName,
             'kind' => 'Native',
-            'nameservers' => [rtrim($zone->primary_ns, '.') . '.'],
+            'nameservers' => [],
             'rrsets' => $rrsets,
         ];
 
