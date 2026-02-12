@@ -57,6 +57,19 @@ class SslService
                 );
             }
 
+            // Ensure nginx config exists and is loaded before certbot runs
+            $nginxConfigPath = "/etc/nginx/sites-enabled/{$domain->name}.conf";
+            if (!file_exists($nginxConfigPath)) {
+                // Try to create vhost if it doesn't exist
+                $this->nginxService->createVhost($domain);
+            } else {
+                // Reload nginx to ensure config is active
+                $this->nginxService->reload();
+            }
+
+            // Small delay to ensure nginx has fully reloaded
+            usleep(500000); // 500ms
+
             // Build certbot arguments
             $certbotArgs = [
                 'certonly',
