@@ -117,6 +117,9 @@ class PowerDnsService
      */
     public function addRecord(DnsZone $zone, array $data): DnsRecord
     {
+        // Normalize the record name - strip zone suffix and trailing dots
+        $data['name'] = $this->normalizeRecordName($data['name'], $zone->zone_name);
+
         // Validate the record
         $this->validateRecord($data['type'], $data['name'], $data['content']);
 
@@ -145,6 +148,11 @@ class PowerDnsService
      */
     public function updateRecord(DnsRecord $record, array $data): DnsRecord
     {
+        // Normalize name if provided
+        if (isset($data['name'])) {
+            $data['name'] = $this->normalizeRecordName($data['name'], $record->zone->zone_name);
+        }
+
         if (isset($data['content'])) {
             $this->validateRecord(
                 $data['type'] ?? $record->type,
@@ -444,6 +452,31 @@ class PowerDnsService
     /**
      * Build rrsets array for PowerDNS API.
      */
+
+    /**
+     * Normalize a record name to relative form (e.g., '@' for zone apex, 'www' for subdomain).
+     */
+    protected function normalizeRecordName(string $name, string $zoneName): string
+    {
+        // Remove trailing dot
+        $name = rtrim($name, '.');
+        $zoneName = rtrim($zoneName, '.');
+
+        // If name equals zone name, it's the apex
+        if ($name === $zoneName) {
+            return '@';
+        }
+
+        // If name ends with .zoneName, strip it
+        $suffix = '.' . $zoneName;
+        if (str_ends_with($name, $suffix)) {
+            return substr($name, 0, -strlen($suffix));
+        }
+
+        // Already relative or '@'
+        return $name;
+    }
+
     protected function buildRrsets(DnsZone $zone): array
     {
         $zoneName = $zone->zone_name . '.';
