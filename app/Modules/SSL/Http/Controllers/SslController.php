@@ -11,6 +11,7 @@ use App\Modules\SSL\Http\Resources\SslCertificateResource;
 use App\Modules\SSL\Http\Resources\SslCertificateCollection;
 use App\Modules\SSL\Models\SslCertificate;
 use App\Modules\SSL\Services\SslService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -229,17 +230,30 @@ class SslController extends Controller
         $this->authorize('delete', $ssl);
 
         try {
-            $this->sslService->revokeCertificate($ssl);
+            // Only revoke if cert is active
+            if ($ssl->status === 'active') {
+                try {
+                    $this->sslService->revokeCertificate($ssl);
+                } catch (\Exception $e) {
+                    // Revoke failed, still delete the record
+                    Log::warning('SSL revoke failed, deleting record anyway', [
+                        'cert_id' => $ssl->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $ssl->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Certificate revoked and deleted successfully.',
+                'message' => 'Certificate deleted successfully.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'REVOKE_FAILED',
+                    'code' => 'DELETE_FAILED',
                     'message' => $e->getMessage(),
                 ],
             ], 422);
