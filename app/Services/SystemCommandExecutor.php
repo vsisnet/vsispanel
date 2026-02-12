@@ -144,7 +144,8 @@ class SystemCommandExecutor
             2 => ['pipe', 'w'],  // stderr
         ];
 
-        $process = proc_open($fullCommand, $descriptorspec, $pipes);
+        $env = array_merge(getenv(), ['PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin']);
+        $process = proc_open($fullCommand, $descriptorspec, $pipes, null, $env);
 
         if (!is_resource($process)) {
             return CommandResult::failed(
