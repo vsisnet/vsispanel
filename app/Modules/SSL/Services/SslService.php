@@ -72,6 +72,7 @@ class SslService
                 '--nginx',
                 '--non-interactive',
                 '--agree-tos',
+                '--expand',
                 '--email', $email,
             ];
 
