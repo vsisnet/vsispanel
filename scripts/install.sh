@@ -427,9 +427,24 @@ PMACONF
     # Optional: Mail server
     if [[ "$SKIP_MAIL" == false ]]; then
         log_info "Installing mail services (Postfix, Dovecot, OpenDKIM)..."
-        apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-pop3d \
+        apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-pop3d dovecot-lmtpd \
             opendkim opendkim-tools >> "$LOG_FILE" 2>&1 || true
-        log_ok "Mail services installed"
+
+        # Configure OpenDKIM directories and permissions
+        log_info "Configuring OpenDKIM..."
+        mkdir -p /etc/opendkim/keys
+        chown -R opendkim:opendkim /etc/opendkim
+        chmod 750 /etc/opendkim/keys
+        systemctl enable opendkim >> "$LOG_FILE" 2>&1 || true
+        systemctl start opendkim >> "$LOG_FILE" 2>&1 || true
+        log_ok "OpenDKIM configured (keys dir: /etc/opendkim/keys)"
+
+        # Enable and start Postfix and Dovecot
+        systemctl enable postfix >> "$LOG_FILE" 2>&1 || true
+        systemctl start postfix >> "$LOG_FILE" 2>&1 || true
+        systemctl enable dovecot >> "$LOG_FILE" 2>&1 || true
+        systemctl start dovecot >> "$LOG_FILE" 2>&1 || true
+        log_ok "Mail services installed and enabled"
     else
         log_warn "Skipped mail server installation (--skip-mail)"
     fi
@@ -437,8 +452,45 @@ PMACONF
     # Optional: DNS server
     if [[ "$SKIP_DNS" == false ]]; then
         log_info "Installing PowerDNS..."
+        # Stop systemd-resolved if it occupies port 53
+        if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+            systemctl stop systemd-resolved >> "$LOG_FILE" 2>&1 || true
+            systemctl disable systemd-resolved >> "$LOG_FILE" 2>&1 || true
+            # Use direct DNS instead of stub resolver
+            if [[ -L /etc/resolv.conf ]]; then
+                rm -f /etc/resolv.conf
+                echo "nameserver 8.8.8.8" > /etc/resolv.conf
+                echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+            fi
+            log_ok "Disabled systemd-resolved (frees port 53 for PowerDNS)"
+        fi
+
         apt-get install -y -qq pdns-server pdns-backend-mysql >> "$LOG_FILE" 2>&1 || true
-        log_ok "PowerDNS installed"
+
+        # Configure PowerDNS API
+        log_info "Configuring PowerDNS API..."
+        local pdns_api_key
+        pdns_api_key=$(openssl rand -hex 32)
+        mkdir -p /etc/powerdns
+        cat > /etc/powerdns/pdns.d/vsispanel-api.conf <<PDNSEOF
+# VSISPanel PowerDNS API configuration
+api=yes
+api-key=${pdns_api_key}
+webserver=yes
+webserver-address=127.0.0.1
+webserver-port=8081
+webserver-allow-from=127.0.0.1
+PDNSEOF
+        chmod 640 /etc/powerdns/pdns.d/vsispanel-api.conf
+        systemctl enable pdns >> "$LOG_FILE" 2>&1 || true
+        systemctl restart pdns >> "$LOG_FILE" 2>&1 || true
+
+        # Save PowerDNS API key to .env
+        if [[ -f "${PANEL_DIR}/.env" ]]; then
+            sed -i '/^VSISPANEL_PDNS_API_KEY=/d' "${PANEL_DIR}/.env"
+            echo "VSISPANEL_PDNS_API_KEY=${pdns_api_key}" >> "${PANEL_DIR}/.env"
+        fi
+        log_ok "PowerDNS installed and API configured (port 8081)"
     else
         log_warn "Skipped DNS server installation (--skip-dns)"
     fi
