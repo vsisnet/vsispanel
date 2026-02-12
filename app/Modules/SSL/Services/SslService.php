@@ -411,12 +411,18 @@ class SslService
      */
     public function getCertificateInfo(string $certPath): array
     {
-        if (!File::exists($certPath)) {
+        // Use executeAsRoot since letsencrypt dirs are root-only
+        $checkResult = $this->executor->executeAsRoot('test', ['-f', $certPath]);
+        if (!$checkResult->success) {
             throw new RuntimeException("Certificate file not found: {$certPath}");
         }
 
-        $certContent = File::get($certPath);
-        return $this->parseCertificateString($certContent);
+        $readResult = $this->executor->executeAsRoot('cat', [$certPath]);
+        if (!$readResult->success) {
+            throw new RuntimeException("Cannot read certificate file: {$certPath}");
+        }
+
+        return $this->parseCertificateString($readResult->output);
     }
 
     /**
