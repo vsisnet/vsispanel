@@ -95,4 +95,27 @@ class ApiTokenController extends Controller
             'message' => 'Token revoked successfully.',
         ]);
     }
+
+    /**
+     * Bulk delete/revoke multiple tokens.
+     */
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $deleted = $request->user()->tokens()
+            ->whereIn('id', $validated['ids'])
+            ->where('name', '!=', 'auth-token')
+            ->where('name', '!=', 'impersonation')
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$deleted} token(s) revoked successfully.",
+            'data' => ['deleted' => $deleted],
+        ]);
+    }
 }

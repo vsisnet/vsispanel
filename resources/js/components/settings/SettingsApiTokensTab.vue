@@ -10,10 +10,16 @@
           {{ $t('apiTokens.description') }}
         </p>
       </div>
-      <VButton variant="primary" @click="showCreateModal = true">
-        <PlusIcon class="w-4 h-4 mr-2" />
-        {{ $t('apiTokens.create') }}
-      </VButton>
+      <div class="flex gap-2">
+        <VButton v-if="selectedIds.length > 0" variant="danger" @click="confirmBulkDelete">
+          <TrashIcon class="w-4 h-4 mr-2" />
+          {{ $t('apiTokens.deleteSelected') }} ({{ selectedIds.length }})
+        </VButton>
+        <VButton variant="primary" @click="showCreateModal = true">
+          <PlusIcon class="w-4 h-4 mr-2" />
+          {{ $t('apiTokens.create') }}
+        </VButton>
+      </div>
     </div>
 
     <!-- Token List -->
@@ -30,6 +36,15 @@
       <table v-else class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead>
           <tr>
+            <th class="px-4 py-3 text-left">
+              <input
+                type="checkbox"
+                :checked="allSelected"
+                :indeterminate="someSelected && !allSelected"
+                @change="toggleSelectAll"
+                class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+              />
+            </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               {{ $t('apiTokens.name') }}
             </th>
@@ -49,6 +64,14 @@
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
           <tr v-for="token in tokens" :key="token.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td class="px-4 py-3">
+              <input
+                type="checkbox"
+                :value="token.id"
+                v-model="selectedIds"
+                class="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+              />
+            </td>
             <td class="px-4 py-3">
               <div class="text-sm font-medium text-gray-900 dark:text-white">{{ token.name }}</div>
               <div class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{ token.token_preview }}</div>
@@ -194,6 +217,17 @@
         <VButton variant="danger" :loading="deleting" @click="deleteToken">{{ $t('apiTokens.delete') }}</VButton>
       </template>
     </VModal>
+
+    <!-- Bulk Delete Confirmation -->
+    <VModal v-model="showBulkDeleteModal" :title="$t('apiTokens.bulkDeleteTitle')" max-width="sm">
+      <p class="text-sm text-gray-700 dark:text-gray-300">
+        {{ $t('apiTokens.bulkDeleteConfirm', { count: selectedIds.length }) }}
+      </p>
+      <template #footer>
+        <VButton variant="secondary" @click="showBulkDeleteModal = false">{{ $t('common.cancel') }}</VButton>
+        <VButton variant="danger" :loading="bulkDeleting" @click="bulkDeleteTokens">{{ $t('apiTokens.deleteSelected') }}</VButton>
+      </template>
+    </VModal>
   </div>
 </template>
 
@@ -216,14 +250,28 @@ const tokens = ref([])
 const loading = ref(true)
 const creating = ref(false)
 const deleting = ref(false)
+const bulkDeleting = ref(false)
 
 const showCreateModal = ref(false)
 const showTokenModal = ref(false)
 const showDeleteModal = ref(false)
+const showBulkDeleteModal = ref(false)
 const newToken = ref('')
 const tokenToDelete = ref(null)
 
 const selectAll = ref(false)
+const selectedIds = ref([])
+
+const allSelected = computed(() => tokens.value.length > 0 && selectedIds.value.length === tokens.value.length)
+const someSelected = computed(() => selectedIds.value.length > 0)
+
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = tokens.value.map(t => t.id)
+  }
+}
 
 const form = ref({
   name: '',
@@ -302,6 +350,7 @@ async function deleteToken() {
     if (data.success) {
       showDeleteModal.value = false
       tokenToDelete.value = null
+      selectedIds.value = selectedIds.value.filter(id => id !== tokenToDelete.value?.id)
       appStore.showToast({ type: 'success', message: t('apiTokens.deleted') })
       await fetchTokens()
     }
@@ -309,6 +358,27 @@ async function deleteToken() {
     console.error('Failed to delete token:', err)
   } finally {
     deleting.value = false
+  }
+}
+
+function confirmBulkDelete() {
+  showBulkDeleteModal.value = true
+}
+
+async function bulkDeleteTokens() {
+  bulkDeleting.value = true
+  try {
+    const { data } = await api.post('/auth/api-tokens/bulk-delete', { ids: selectedIds.value })
+    if (data.success) {
+      showBulkDeleteModal.value = false
+      appStore.showToast({ type: 'success', message: t('apiTokens.bulkDeleteSuccess', { count: data.data.deleted }) })
+      selectedIds.value = []
+      await fetchTokens()
+    }
+  } catch (err) {
+    appStore.showToast({ type: 'error', message: t('apiTokens.bulkDeleteError') })
+  } finally {
+    bulkDeleting.value = false
   }
 }
 

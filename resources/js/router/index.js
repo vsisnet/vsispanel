@@ -33,6 +33,10 @@ const ProfilePage = () => import('@/pages/ProfilePage.vue')
 const NotFoundPage = () => import('@/pages/NotFoundPage.vue')
 const SetupWizardPage = () => import('@/pages/SetupWizardPage.vue')
 const AboutPage = () => import('@/pages/AboutPage.vue')
+const CreateWebsitePage = () => import('@/pages/CreateWebsitePage.vue')
+const CreateDatabasePage = () => import('@/pages/CreateDatabasePage.vue')
+const CreateEmailPage = () => import('@/pages/CreateEmailPage.vue')
+const CreateFtpPage = () => import('@/pages/CreateFtpPage.vue')
 const MigrationPage = () => import('@/pages/MigrationPage.vue')
 const ForgotPasswordPage = () => import('@/pages/ForgotPasswordPage.vue')
 const ResetPasswordPage = () => import('@/pages/ResetPasswordPage.vue')
@@ -84,10 +88,22 @@ const routes = [
     meta: { requiresAuth: true, title: 'nav.websites', permission: 'domains.view' }
   },
   {
+    path: '/websites/create',
+    name: 'create-website',
+    component: CreateWebsitePage,
+    meta: { requiresAuth: true, title: 'websites.addDomain', permission: 'domains.create' }
+  },
+  {
     path: '/websites/:id',
     name: 'domain-detail',
     component: DomainDetailPage,
     meta: { requiresAuth: true, title: 'nav.websites', permission: 'domains.view' }
+  },
+  {
+    path: '/databases/create',
+    name: 'create-database',
+    component: CreateDatabasePage,
+    meta: { requiresAuth: true, title: 'databases.createDatabase', permission: 'databases.create' }
   },
   {
     path: '/databases',
@@ -102,6 +118,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'nav.fileManager', permission: 'files.view' }
   },
   {
+    path: '/email/create',
+    name: 'create-email',
+    component: CreateEmailPage,
+    meta: { requiresAuth: true, title: 'email.createAccount', permission: 'mail.create' }
+  },
+  {
     path: '/email',
     name: 'email',
     component: EmailPage,
@@ -112,6 +134,12 @@ const routes = [
     name: 'dns',
     component: DnsPage,
     meta: { requiresAuth: true, title: 'nav.dns', permission: 'dns.view' }
+  },
+  {
+    path: '/ftp/create',
+    name: 'create-ftp',
+    component: CreateFtpPage,
+    meta: { requiresAuth: true, title: 'ftp.createAccount', permission: 'ftp.create' }
   },
   {
     path: '/ftp',

@@ -1,5 +1,5 @@
 <template>
-  <nav class="flex" aria-label="Breadcrumb">
+  <nav class="flex mb-4" aria-label="Breadcrumb">
     <ol class="inline-flex items-center space-x-1 md:space-x-2">
       <li class="inline-flex items-center">
         <router-link
@@ -10,7 +10,7 @@
           {{ $t('nav.dashboard') }}
         </router-link>
       </li>
-      <li v-for="(crumb, index) in breadcrumbs" :key="index" class="inline-flex items-center">
+      <li v-for="(crumb, index) in resolvedBreadcrumbs" :key="index" class="inline-flex items-center">
         <ChevronRightIcon class="w-4 h-4 text-gray-400 mx-1" />
         <router-link
           v-if="crumb.to"
@@ -33,19 +33,23 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { HomeIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 
+const props = defineProps({
+  items: {
+    type: Array,
+    default: null
+  }
+})
+
 const route = useRoute()
 const { t } = useI18n()
 
-const breadcrumbs = computed(() => {
+const resolvedBreadcrumbs = computed(() => {
+  if (props.items) return props.items
+
   const crumbs = []
-
   if (route.meta.title) {
-    crumbs.push({
-      label: t(route.meta.title),
-      to: null
-    })
+    crumbs.push({ label: t(route.meta.title), to: null })
   }
-
   return crumbs
 })
 </script>

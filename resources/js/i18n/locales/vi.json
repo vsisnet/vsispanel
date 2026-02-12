@@ -695,7 +695,14 @@
     "newPasswordPlaceholder": "Nhập mật khẩu mới",
     "passwordError": "Lỗi mật khẩu",
     "passwordPlaceholder": "Nhập mật khẩu",
-    "updateError": "Lỗi khi cập nhật"
+    "updateError": "Lỗi khi cập nhật",
+    "domain": "Tên miền",
+    "selectDomain": "Chọn tên miền",
+    "noDomains": "Không có tên miền. Hãy tạo website trước.",
+    "setupMailFirst": "Mail chưa được thiết lập cho tên miền này.",
+    "setupMail": "Thiết lập Mail",
+    "setupSuccess": "Đã thiết lập mail domain thành công.",
+    "setupError": "Không thể thiết lập mail domain."
   },
   "ssl": {
     "certificateActive": "Chứng chỉ SSL đang hoạt động",
@@ -2262,6 +2269,11 @@
     "allPermissions": "Tất cả quyền",
     "selectPermissions": "Chọn quyền hạn",
     "noTokens": "Chưa có API token. Tạo một token để bắt đầu.",
-    "never": "Chưa bao giờ"
+    "never": "Chưa bao giờ",
+    "deleteSelected": "Xóa đã chọn",
+    "bulkDeleteTitle": "Xóa nhiều Token",
+    "bulkDeleteConfirm": "Bạn có chắc muốn thu hồi {count} token đã chọn? Các ứng dụng sử dụng các token này sẽ mất quyền truy cập.",
+    "bulkDeleteSuccess": "Đã thu hồi {count} token thành công.",
+    "bulkDeleteError": "Không thể thu hồi token."
   }
 }

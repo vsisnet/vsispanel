@@ -695,7 +695,14 @@
       "removedFromBlacklist": "Removed from blacklist",
       "settingsSaved": "Spam settings saved successfully",
       "settingsError": "Failed to save spam settings"
-    }
+    },
+    "domain": "Domain",
+    "selectDomain": "Select a domain",
+    "noDomains": "No domains available. Create a website first.",
+    "setupMailFirst": "Mail is not set up for this domain yet.",
+    "setupMail": "Set Up Mail",
+    "setupSuccess": "Mail domain set up successfully.",
+    "setupError": "Failed to set up mail domain."
   },
   "ssl": {
     "certificateActive": "SSL Certificate Active",
@@ -2262,6 +2269,11 @@
     "allPermissions": "All Permissions",
     "selectPermissions": "Select Permissions",
     "noTokens": "No API tokens yet. Create one to get started.",
-    "never": "Never"
+    "never": "Never",
+    "deleteSelected": "Delete Selected",
+    "bulkDeleteTitle": "Delete Multiple Tokens",
+    "bulkDeleteConfirm": "Are you sure you want to revoke {count} selected tokens? Applications using these tokens will lose access.",
+    "bulkDeleteSuccess": "{count} token(s) revoked successfully.",
+    "bulkDeleteError": "Failed to revoke tokens."
   }
 }

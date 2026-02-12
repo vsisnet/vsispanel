@@ -44,6 +44,7 @@ Route::prefix('auth')->group(function () {
             Route::get('/', [ApiTokenController::class, 'index']);
             Route::post('/', [ApiTokenController::class, 'store']);
             Route::delete('/{id}', [ApiTokenController::class, 'destroy']);
+            Route::post('/bulk-delete', [ApiTokenController::class, 'bulkDestroy']);
         });
     });
 });
