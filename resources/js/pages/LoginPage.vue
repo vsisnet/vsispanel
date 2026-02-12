@@ -39,6 +39,12 @@
           </span>
         </label>
       </div>
+        <router-link
+          to="/forgot-password"
+          class="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+        >
+          {{ $t("auth.forgotPassword") }}
+        </router-link>
 
       <div v-if="errors.general" class="p-3 bg-red-50 dark:bg-red-900/30 rounded-lg">
         <p class="text-sm text-red-600 dark:text-red-400">{{ errors.general }}</p>

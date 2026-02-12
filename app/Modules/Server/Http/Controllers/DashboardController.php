@@ -10,6 +10,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\Models\Activity;
+use App\Modules\Domain\Models\Domain;
+use App\Modules\Database\Models\ManagedDatabase;
+use App\Modules\Mail\Models\MailAccount;
+use App\Modules\FTP\Models\FtpAccount;
 
 class DashboardController extends Controller
 {
@@ -25,22 +29,37 @@ class DashboardController extends Controller
         $user = $request->user();
 
         // Get counts based on user role
+        // Scope queries based on user role
+        $isAdmin = $user->isAdmin();
+
+        $domainQuery = Domain::query();
+        $dbQuery = ManagedDatabase::query();
+        $mailQuery = MailAccount::query();
+        $ftpQuery = FtpAccount::query();
+
+        if (!$isAdmin) {
+            $domainQuery->where('user_id', $user->id);
+            $dbQuery->where('user_id', $user->id);
+            $mailQuery->whereHas('domain', fn($q) => $q->where('user_id', $user->id));
+            $ftpQuery->whereHas('domain', fn($q) => $q->where('user_id', $user->id));
+        }
+
         $stats = [
             'websites' => [
-                'count' => 0, // Will be populated when Domain module is ready
+                'count' => $domainQuery->count(),
                 'label' => 'Websites',
             ],
             'databases' => [
-                'count' => 0, // Will be populated when Database module is ready
+                'count' => $dbQuery->count(),
                 'label' => 'Databases',
             ],
             'email_accounts' => [
-                'count' => 0, // Will be populated when Mail module is ready
+                'count' => $mailQuery->count(),
                 'label' => 'Email Accounts',
             ],
-            'domains' => [
-                'count' => 0, // Will be populated when Domain module is ready
-                'label' => 'Domains',
+            'ftp_accounts' => [
+                'count' => $ftpQuery->count(),
+                'label' => 'FTP Accounts',
             ],
         ];
 

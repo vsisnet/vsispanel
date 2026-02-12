@@ -1,7 +1,9 @@
 <?php
 
+use App\Modules\Auth\Http\Controllers\ForgotPasswordController;
 use App\Modules\Auth\Http\Controllers\LoginController;
 use App\Modules\Auth\Http\Controllers\ProfileController;
+use App\Modules\Auth\Http\Controllers\ResetPasswordController;
 use App\Modules\Auth\Http\Controllers\TwoFactorController;
 use App\Modules\Auth\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +18,8 @@ Route::prefix('auth')->group(function () {
     // Public routes
     Route::post('login', [LoginController::class, 'login']);
     Route::post('login/2fa', [LoginController::class, 'verifyTwoFactor']);
+    Route::post('forgot-password', [ForgotPasswordController::class, 'sendResetLink']);
+    Route::post('reset-password', [ResetPasswordController::class, 'reset']);
 
     // Protected routes (require authentication)
     Route::middleware(['auth:sanctum', 'account.active', 'track.login'])->group(function () {

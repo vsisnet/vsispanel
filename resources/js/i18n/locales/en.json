@@ -61,7 +61,16 @@
     "twoFactorDescription": "Enter the 6-digit code from your authenticator app",
     "loginSuccess": "Login successful",
     "loginFailed": "Invalid email or password",
-    "logoutSuccess": "Logout successful"
+    "logoutSuccess": "Logout successful",
+    "forgotPasswordDesc": "Enter your email address and we will send you a password reset link.",
+    "sendResetLink": "Send Reset Link",
+    "resetLinkSent": "A password reset link has been sent to your email address.",
+    "backToLogin": "Back to Login",
+    "resetPassword": "Reset Password",
+    "resetPasswordDesc": "Enter your new password below.",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "passwordResetSuccess": "Your password has been reset successfully."
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -129,7 +138,11 @@
     "noActivity": "No activity yet",
     "noActivityDesc": "Recent activities will appear here",
     "noServices": "No services",
-    "noServicesDesc": "Service information not available"
+    "noServicesDesc": "Service information not available",
+    "ftpAccounts": "FTP Accounts",
+    "fileManager": "File Manager",
+    "sslCertificate": "SSL Certificate",
+    "migration": "Migration"
   },
   "profile": {
     "title": "Profile",
@@ -143,7 +156,16 @@
     "timezone": "Timezone",
     "twoFactor": "Two-Factor Authentication",
     "enable2fa": "Enable 2FA",
-    "disable2fa": "Disable 2FA"
+    "disable2fa": "Disable 2FA",
+    "personalInfo": "Personal Information",
+    "profileUpdated": "Profile updated successfully.",
+    "passwordUpdated": "Password updated successfully.",
+    "twoFactorEnabled": "Two-factor authentication is enabled.",
+    "twoFactorDesc": "Add an extra layer of security to your account by enabling two-factor authentication.",
+    "scanQrCode": "Scan this QR code with your authenticator app:",
+    "manualCode": "Or enter this code manually:",
+    "twoFactorEnabledSuccess": "Two-factor authentication has been enabled.",
+    "twoFactorDisabledSuccess": "Two-factor authentication has been disabled."
   },
   "errors": {
     "notFound": "Page not found",

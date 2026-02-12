@@ -367,10 +367,10 @@ const statCards = computed(() => {
       iconColor: 'text-purple-600 dark:text-purple-400'
     },
     {
-      name: 'disk',
-      label: 'dashboard.diskUsage',
-      value: `${stats?.disk?.percentage ?? 0}%`,
-      subtitle: `${stats?.disk?.used ?? '0'} / ${stats?.disk?.total ?? '0'}`,
+      name: 'ftp',
+      label: 'dashboard.ftpAccounts',
+      value: stats?.ftp_accounts?.count ?? 0,
+      subtitle: t('dashboard.active'),
       icon: ServerIcon,
       bgColor: 'bg-orange-100 dark:bg-orange-900/30',
       iconColor: 'text-orange-600 dark:text-orange-400'
@@ -518,12 +518,20 @@ function getActivityIcon(event) {
 }
 
 // Quick actions
-const quickActions = [
-  { name: 'addWebsite', label: 'dashboard.addWebsite', icon: PlusIcon, route: '/websites/create' },
-  { name: 'createDatabase', label: 'dashboard.createDatabase', icon: CircleStackIcon, route: '/databases/create' },
-  { name: 'addEmail', label: 'dashboard.addEmail', icon: EnvelopeIcon, route: '/email/create' },
-  { name: 'createBackup', label: 'dashboard.createBackup', icon: CloudArrowUpIcon, route: '/backup/create' }
-]
+const quickActions = computed(() => {
+  const actions = [
+    { name: 'addWebsite', label: 'dashboard.addWebsite', icon: PlusIcon, route: '/websites/create' },
+    { name: 'createDatabase', label: 'dashboard.createDatabase', icon: CircleStackIcon, route: '/databases/create' },
+    { name: 'addEmail', label: 'dashboard.addEmail', icon: EnvelopeIcon, route: '/email/create' },
+    { name: 'fileManager', label: 'dashboard.fileManager', icon: ServerIcon, route: '/files' },
+    { name: 'createBackup', label: 'dashboard.createBackup', icon: CloudArrowUpIcon, route: '/backup' },
+    { name: 'sslCertificate', label: 'dashboard.sslCertificate', icon: CheckCircleIcon, route: '/ssl' },
+  ]
+  if (authStore.isAdmin) {
+    actions.push({ name: 'migration', label: 'dashboard.migration', icon: ArrowPathIcon, route: '/migration' })
+  }
+  return actions
+})
 
 function handleQuickAction(route) {
   router.push(route)

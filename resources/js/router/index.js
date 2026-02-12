@@ -34,6 +34,8 @@ const NotFoundPage = () => import('@/pages/NotFoundPage.vue')
 const SetupWizardPage = () => import('@/pages/SetupWizardPage.vue')
 const AboutPage = () => import('@/pages/AboutPage.vue')
 const MigrationPage = () => import('@/pages/MigrationPage.vue')
+const ForgotPasswordPage = () => import('@/pages/ForgotPasswordPage.vue')
+const ResetPasswordPage = () => import('@/pages/ResetPasswordPage.vue')
 
 const routes = [
   // Setup wizard (before installation)
@@ -50,6 +52,18 @@ const routes = [
     name: 'login',
     component: LoginPage,
     meta: { guest: true, layout: 'auth' }
+  },
+  {
+    path: "/forgot-password",
+    name: "forgot-password",
+    component: ForgotPasswordPage,
+    meta: { guest: true, layout: "auth" }
+  },
+  {
+    path: "/reset-password/:token",
+    name: "reset-password",
+    component: ResetPasswordPage,
+    meta: { guest: true, layout: "auth" }
   },
 
   // Protected routes
