@@ -25,6 +25,7 @@ class UserResource extends JsonResource
             'last_login_ip' => $this->last_login_ip,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'permissions' => $this->getAllPermissions()->pluck('name'),
         ];
     }
 }
