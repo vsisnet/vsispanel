@@ -85,14 +85,22 @@ class SslService
             $result = $this->executor->executeAsRoot('certbot', $certbotArgs);
 
             if (!$result->success) {
-                throw new RuntimeException("Certbot failed: " . $result->stderr);
+                // Check if cert already exists (not due for renewal)
+                $existsCheck = $this->executor->executeAsRoot("test", ["-f", "/etc/letsencrypt/live/{$domain->name}/fullchain.pem"]);
+                if (!$existsCheck->success) {
+                    throw new RuntimeException("Certbot failed: " . $result->stderr);
+                }
+                // Cert exists, continue with import
             }
 
             // Parse certificate paths from certbot output or use standard paths
             $certPath = "/etc/letsencrypt/live/{$domain->name}/fullchain.pem";
             $keyPath = "/etc/letsencrypt/live/{$domain->name}/privkey.pem";
 
-            if (!File::exists($certPath) || !File::exists($keyPath)) {
+            // Check files as root (letsencrypt dirs are root-only)
+            $checkResult = $this->executor->executeAsRoot("test", ["-f", $certPath]);
+            $checkKey = $this->executor->executeAsRoot("test", ["-f", $keyPath]);
+            if (!$checkResult->success || !$checkKey->success) {
                 throw new RuntimeException("Certificate files not found after certbot execution.");
             }
 
