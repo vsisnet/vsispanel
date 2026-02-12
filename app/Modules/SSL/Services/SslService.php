@@ -422,7 +422,7 @@ class SslService
             throw new RuntimeException("Cannot read certificate file: {$certPath}");
         }
 
-        return $this->parseCertificateString($readResult->output);
+        return $this->parseCertificateString($readResult->stdout);
     }
 
     /**
