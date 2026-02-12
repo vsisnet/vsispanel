@@ -41,7 +41,9 @@
     "stopped": "Đã dừng",
     "perPage": "Mỗi trang",
     "remove": "Xóa",
-    "showingOf": "Hiển thị {from} đến {to} trong {total}"
+    "showingOf": "Hiển thị {from} đến {to} trong {total}",
+    "browse": "Duyệt",
+    "select": "Chọn"
   },
   "sidebar": {
     "expand": "Mở rộng sidebar",
@@ -656,7 +658,21 @@
       "removedFromBlacklist": "Đã xóa khỏi danh sách đen",
       "settingsSaved": "Đã lưu cài đặt spam",
       "settingsError": "Không thể lưu cài đặt spam"
-    }
+    },
+    "accountCreated": "Tạo tài khoản email thành công",
+    "accountDeleted": "Xóa tài khoản email thành công",
+    "accountUpdated": "Cập nhật tài khoản email thành công",
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa tài khoản email này?",
+    "editAccount": "Sửa tài khoản email",
+    "email": "Email",
+    "enableError": "Lỗi khi bật email",
+    "enableMailFirst": "Vui lòng bật dịch vụ email trước",
+    "mailNotEnabled": "Dịch vụ email chưa được bật",
+    "newPassword": "Mật khẩu mới",
+    "newPasswordPlaceholder": "Nhập mật khẩu mới",
+    "passwordError": "Lỗi mật khẩu",
+    "passwordPlaceholder": "Nhập mật khẩu",
+    "updateError": "Lỗi khi cập nhật"
   },
   "ssl": {
     "certificateActive": "Chứng chỉ SSL đang hoạt động",
@@ -804,7 +820,8 @@
     "selectedRecords": "Đã chọn {count} bản ghi",
     "bulkDeleteConfirm": "Bạn có chắc chắn muốn xóa {count} bản ghi đã chọn?",
     "bulkDeleteSuccess": "Đã xóa {count} bản ghi thành công",
-    "bulkDeleteError": "Không thể xóa các bản ghi"
+    "bulkDeleteError": "Không thể xóa các bản ghi",
+    "ipHint": "Gợi ý: sử dụng địa chỉ IP của server"
   },
   "logs": {
     "access": "Access Log",

@@ -406,7 +406,8 @@
     "unsaved": "Unsaved changes",
     "unsavedChanges": "This file has unsaved changes. Close anyway?",
     "line": "Ln",
-    "col": "Col"
+    "col": "Col",
+    "select": "Select"
   },
   "databases": {
     "title": "Database Manager",
