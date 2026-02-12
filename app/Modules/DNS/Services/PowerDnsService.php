@@ -42,6 +42,10 @@ class PowerDnsService
                 'serial' => (int) now()->format('Ymd') . '01',
                 'primary_ns' => $primaryNs,
                 'admin_email' => str_replace('@', '.', $adminEmail),
+                'refresh' => config('vsispanel.dns.soa_refresh', 10800),
+                'retry' => config('vsispanel.dns.soa_retry', 3600),
+                'expire' => config('vsispanel.dns.soa_expire', 604800),
+                'minimum_ttl' => config('vsispanel.dns.soa_minimum', 3600),
                 'status' => 'active',
             ]);
 
@@ -72,7 +76,7 @@ class PowerDnsService
             [
                 'name' => '@',
                 'type' => 'NS',
-                'content' => $zone->primary_ns,
+                'content' => rtrim($zone->primary_ns, '.') . '.',
                 'ttl' => 86400,
             ],
             // A record for root domain
@@ -388,7 +392,7 @@ class PowerDnsService
         $payload = [
             'name' => $zoneName,
             'kind' => 'Native',
-            'nameservers' => [$zone->primary_ns . '.'],
+            'nameservers' => [rtrim($zone->primary_ns, '.') . '.'],
             'rrsets' => $rrsets,
         ];
 

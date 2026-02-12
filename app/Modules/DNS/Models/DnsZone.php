@@ -88,10 +88,13 @@ class DnsZone extends Model
      */
     public function getSoaContent(): string
     {
+        $ns = rtrim($this->primary_ns, '.') . '.';
+        $admin = rtrim($this->admin_email, '.') . '.';
+
         return sprintf(
             '%s %s %d %d %d %d %d',
-            $this->primary_ns,
-            $this->admin_email,
+            $ns,
+            $admin,
             $this->serial,
             $this->refresh,
             $this->retry,
