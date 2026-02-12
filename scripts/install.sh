@@ -896,6 +896,11 @@ EOSQL
     fi
     log_ok "Seeding complete"
 
+    # Seed letsencrypt_email setting
+    log_info "Setting default Let's Encrypt email..."
+    php artisan tinker --execute="App\Modules\Settings\Models\SystemSetting::updateOrCreate(['group'=>'ssl','key'=>'letsencrypt_email'],['value'=>'$ADMIN_EMAIL','type'=>'string']);" >> "$LOG_FILE" 2>&1
+    log_ok "Let's Encrypt email configured"
+
     # Remove admin credentials from .env (no longer needed)
     sed -i '/^ADMIN_PASSWORD=/d' .env
     sed -i '/^ADMIN_EMAIL=/d' .env

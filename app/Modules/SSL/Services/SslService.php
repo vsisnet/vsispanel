@@ -6,6 +6,7 @@ namespace App\Modules\SSL\Services;
 
 use App\Modules\Domain\Models\Domain;
 use App\Modules\Settings\Models\SystemSetting;
+use App\Models\User;
 use App\Modules\SSL\Models\SslCertificate;
 use App\Modules\WebServer\Services\NginxService;
 use App\Services\SystemCommandExecutor;
@@ -49,13 +50,8 @@ class SslService
                 throw new RuntimeException("No valid DNS records found for domain: {$domain->name}");
             }
 
-            $email = $this->getLetsEncryptEmail();
+            $email = $this->getLetsEncryptEmail($domain->name);
 
-            if (empty($email)) {
-                throw new RuntimeException(
-                    "Let's Encrypt email not configured. Please set it in Settings > SSL before issuing certificates."
-                );
-            }
 
             // Ensure nginx config exists and is loaded before certbot runs
             $nginxConfigPath = "/etc/nginx/sites-enabled/{$domain->name}.conf";
@@ -134,7 +130,7 @@ class SslService
      * Get the email address for Let's Encrypt registration.
      * Priority: Settings DB → env/config → empty
      */
-    protected function getLetsEncryptEmail(): string
+    protected function getLetsEncryptEmail(string $domainName = 'localhost'): string
     {
         // 1. Check Settings DB
         $setting = SystemSetting::where('group', 'ssl')
@@ -148,7 +144,20 @@ class SslService
         // 2. Fall back to env/config
         $configEmail = config('vsispanel.ssl.letsencrypt_email', '');
 
-        return $configEmail ?: '';
+        if (!empty($configEmail)) {
+            return $configEmail;
+        }
+
+        // 3. Fall back to first admin user's email
+        $adminUser = User::where('role', 'admin')->first()
+            ?? User::orderBy('id')->first();
+
+        if ($adminUser && !empty($adminUser->email)) {
+            return $adminUser->email;
+        }
+
+        // 4. Last resort: never block SSL issuance
+        return 'admin@' . $domainName;
     }
 
     /**
