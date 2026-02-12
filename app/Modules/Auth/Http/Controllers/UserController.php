@@ -11,15 +11,26 @@ use App\Modules\Auth\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class UserController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * List all users with pagination and filtering.
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', User::class);
+
+        $authUser = $request->user();
         $query = User::query();
+
+        // Scoping: reseller sees only their customers
+        if ($authUser->isReseller()) {
+            $query->where('parent_id', $authUser->id);
+        }
 
         // Search filter
         if ($search = $request->input('search')) {
@@ -65,16 +76,33 @@ class UserController extends Controller
     /**
      * Get user statistics.
      */
-    public function stats(): JsonResponse
+    public function stats(Request $request): JsonResponse
     {
-        $stats = [
-            'total' => User::count(),
-            'active' => User::where('status', 'active')->count(),
-            'suspended' => User::where('status', 'suspended')->count(),
-            'admins' => User::where('role', 'admin')->count(),
-            'resellers' => User::where('role', 'reseller')->count(),
-            'users' => User::where('role', 'user')->count(),
-        ];
+        $this->authorize('viewAny', User::class);
+
+        $authUser = $request->user();
+
+        if ($authUser->isAdmin()) {
+            $stats = [
+                'total' => User::count(),
+                'active' => User::where('status', 'active')->count(),
+                'suspended' => User::where('status', 'suspended')->count(),
+                'admins' => User::where('role', 'admin')->count(),
+                'resellers' => User::where('role', 'reseller')->count(),
+                'users' => User::where('role', 'user')->count(),
+            ];
+        } else {
+            // Reseller: only their customers
+            $base = User::where('parent_id', $authUser->id);
+            $stats = [
+                'total' => (clone $base)->count(),
+                'active' => (clone $base)->where('status', 'active')->count(),
+                'suspended' => (clone $base)->where('status', 'suspended')->count(),
+                'admins' => 0,
+                'resellers' => 0,
+                'users' => (clone $base)->where('role', 'user')->count(),
+            ];
+        }
 
         return response()->json([
             'success' => true,
@@ -88,6 +116,8 @@ class UserController extends Controller
      */
     public function show(User $user): JsonResponse
     {
+        $this->authorize('view', $user);
+
         return response()->json([
             'success' => true,
             'data' => new UserResource($user),
@@ -100,9 +130,22 @@ class UserController extends Controller
      */
     public function store(CreateUserRequest $request): JsonResponse
     {
+        $this->authorize('create', User::class);
+
         $data = $request->validated();
+        $authUser = $request->user();
+
+        // Resellers can only create 'user' role
+        if ($authUser->isReseller()) {
+            $data['role'] = 'user';
+            $data['parent_id'] = $authUser->id;
+        }
 
         $user = User::create($data);
+
+        // Assign Spatie role
+        $roleName = $data['role'] ?? 'user';
+        $user->assignRole($roleName);
 
         return response()->json([
             'success' => true,
@@ -116,9 +159,28 @@ class UserController extends Controller
      */
     public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
+        $this->authorize('update', $user);
+
         $data = $request->validated();
+        $authUser = $request->user();
+
+        // Resellers cannot change role to admin/reseller
+        if ($authUser->isReseller() && isset($data['role']) && in_array($data['role'], ['admin', 'reseller'])) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'FORBIDDEN',
+                    'message' => 'You cannot assign this role.',
+                ],
+            ], 403);
+        }
 
         $user->update($data);
+
+        // Sync Spatie role if role changed
+        if (isset($data['role'])) {
+            $user->syncRoles([$data['role']]);
+        }
 
         return response()->json([
             'success' => true,
@@ -132,6 +194,8 @@ class UserController extends Controller
      */
     public function destroy(Request $request, User $user): JsonResponse
     {
+        $this->authorize('delete', $user);
+
         // Prevent deleting yourself
         if ($user->id === $request->user()->id) {
             return response()->json([
@@ -157,6 +221,8 @@ class UserController extends Controller
      */
     public function suspend(Request $request, User $user): JsonResponse
     {
+        $this->authorize('suspend', $user);
+
         // Prevent suspending yourself
         if ($user->id === $request->user()->id) {
             return response()->json([
@@ -180,8 +246,10 @@ class UserController extends Controller
     /**
      * Unsuspend a user.
      */
-    public function unsuspend(User $user): JsonResponse
+    public function unsuspend(Request $request, User $user): JsonResponse
     {
+        $this->authorize('suspend', $user);
+
         $user->update(['status' => 'active']);
 
         return response()->json([
@@ -192,13 +260,42 @@ class UserController extends Controller
     }
 
     /**
+     * Impersonate a user.
+     */
+    public function impersonate(Request $request, User $user): JsonResponse
+    {
+        $this->authorize('impersonate', $user);
+
+        $token = $user->createToken('impersonation', ['*'])->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $token,
+                'user' => new UserResource($user),
+                'original_user_id' => $request->user()->id,
+            ],
+            'message' => "Now viewing as {$user->name}.",
+        ]);
+    }
+
+    /**
      * Get all users for dropdown selection (minimal data).
      */
     public function listForSelect(Request $request): JsonResponse
     {
+        $authUser = $request->user();
+
         $query = User::query()
             ->where('status', 'active')
             ->select(['id', 'name', 'email', 'username', 'role']);
+
+        // Scoping
+        if ($authUser->isReseller()) {
+            $query->where('parent_id', $authUser->id);
+        } elseif ($authUser->isUser()) {
+            $query->where('id', $authUser->id);
+        }
 
         // Optional role filter
         if ($role = $request->input('role')) {

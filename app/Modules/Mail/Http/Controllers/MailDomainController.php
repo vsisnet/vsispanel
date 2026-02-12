@@ -28,7 +28,12 @@ class MailDomainController extends Controller
 
         $query = MailDomain::with(['domain', 'accounts'])
             ->whereHas('domain', function ($q) use ($user) {
-                if (!$user->isAdmin()) {
+                if ($user->isAdmin()) {
+                    // Admin sees all
+                } elseif ($user->isReseller()) {
+                    $customerIds = \App\Modules\Auth\Models\User::where('parent_id', $user->id)->pluck('id')->push($user->id)->toArray();
+                    $q->whereIn('user_id', $customerIds);
+                } else {
                     $q->where('user_id', $user->id);
                 }
             });

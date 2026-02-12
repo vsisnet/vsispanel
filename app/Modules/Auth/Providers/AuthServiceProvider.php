@@ -6,6 +6,9 @@ namespace App\Modules\Auth\Providers;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
+use App\Modules\Auth\Models\User;
+use App\Modules\Auth\Policies\UserPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -27,6 +30,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(User::class, UserPolicy::class);
         $this->registerRoutes();
         $this->registerMigrations();
         $this->registerConfig();

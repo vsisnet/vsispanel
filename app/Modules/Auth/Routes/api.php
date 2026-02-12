@@ -59,4 +59,5 @@ Route::prefix('users')->middleware(['auth:sanctum', 'account.active'])->group(fu
     // User actions
     Route::post('/{user}/suspend', [UserController::class, 'suspend']);
     Route::post('/{user}/unsuspend', [UserController::class, 'unsuspend']);
+    Route::post('/{user}/impersonate', [UserController::class, 'impersonate']);
 });

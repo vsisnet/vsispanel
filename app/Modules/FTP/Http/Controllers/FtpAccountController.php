@@ -38,8 +38,13 @@ class FtpAccountController extends Controller
             $query->where('status', $status);
         }
 
-        // Filter by user (for non-admin)
-        if (!$request->user()->isAdmin()) {
+        // Filter by user ownership
+        if ($request->user()->isAdmin()) {
+            // Admin sees all
+        } elseif ($request->user()->isReseller()) {
+            $customerIds = \App\Modules\Auth\Models\User::where('parent_id', $request->user()->id)->pluck('id')->push($request->user()->id)->toArray();
+            $query->whereIn('user_id', $customerIds);
+        } else {
             $query->forUser($request->user()->id);
         }
 

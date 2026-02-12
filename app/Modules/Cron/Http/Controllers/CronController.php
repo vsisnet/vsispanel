@@ -21,11 +21,15 @@ class CronController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = CronJob::where('user_id', $request->user()->id)
-            ->orderBy('created_at', 'desc');
+        $user = $request->user();
 
-        if ($request->user()->role === 'admin') {
+        if ($user->isAdmin()) {
             $query = CronJob::with('user')->orderBy('created_at', 'desc');
+        } elseif ($user->isReseller()) {
+            $customerIds = \App\Modules\Auth\Models\User::where('parent_id', $user->id)->pluck('id')->push($user->id)->toArray();
+            $query = CronJob::whereIn('user_id', $customerIds)->orderBy('created_at', 'desc');
+        } else {
+            $query = CronJob::where('user_id', $user->id)->orderBy('created_at', 'desc');
         }
 
         // Pre-compute human-readable schedules map to avoid repeated parsing
