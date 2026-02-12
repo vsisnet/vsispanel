@@ -211,9 +211,8 @@ class SslService
                     return true;
                 }
             }
-            // Domain has DNS but doesn't point to this server
-            // Still allow it - Let's Encrypt will verify via HTTP challenge
-            return true;
+            // Domain has DNS but doesn't point to this server - exclude it
+            return false;
         }
 
         return true;
