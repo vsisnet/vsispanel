@@ -27,6 +27,11 @@ Route::get('/api/setup/status', function () {
     ]);
 });
 
+// SSO Auto-Login Route
+Route::get("/sso", function () {
+    return view("sso");
+});
+
 // Serve Vue SPA for all routes
 Route::get('/{any}', function () {
     return view('app');
