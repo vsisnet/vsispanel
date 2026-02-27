@@ -57,7 +57,7 @@
             </button>
           </div>
           <div class="mt-6 flex justify-end">
-            <button @click="step = 1" :disabled="!form.source_type" class="btn-primary">
+            <button @click="step = 1" :disabled="!form.source_type" class="inline-flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
               {{ $t('common.next') }} →
             </button>
           </div>
@@ -101,8 +101,8 @@
             </div>
           </div>
           <div class="mt-6 flex justify-between">
-            <button @click="step = 0" class="btn-secondary">← {{ $t('common.back') }}</button>
-            <button @click="testAndDiscover" :disabled="!canTestConnection || testing" class="btn-primary">
+            <button @click="step = 0" class="inline-flex items-center px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors duration-150">← {{ $t('common.back') }}</button>
+            <button @click="testAndDiscover" :disabled="!canTestConnection || testing" class="inline-flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <span v-if="testing" class="flex items-center">
                 <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 {{ $t('migration.testing') }}
@@ -176,8 +176,8 @@
           </div>
 
           <div class="mt-6 flex justify-between">
-            <button @click="step = 1" class="btn-secondary">← {{ $t('common.back') }}</button>
-            <button @click="step = 3" :disabled="!hasSelectedItems" class="btn-primary">
+            <button @click="step = 1" class="inline-flex items-center px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors duration-150">← {{ $t('common.back') }}</button>
+            <button @click="step = 3" :disabled="!hasSelectedItems" class="inline-flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
               {{ $t('migration.reviewStart') }} →
             </button>
           </div>
@@ -215,8 +215,8 @@
           </div>
 
           <div class="mt-6 flex justify-between">
-            <button @click="step = 2" class="btn-secondary">← {{ $t('common.back') }}</button>
-            <button @click="startMigration" :disabled="starting" class="btn-primary bg-green-600 hover:bg-green-700">
+            <button @click="step = 2" class="inline-flex items-center px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors duration-150">← {{ $t('common.back') }}</button>
+            <button @click="startMigration" :disabled="starting" class="inline-flex items-center px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <span v-if="starting" class="flex items-center">
                 <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 {{ $t('migration.starting') }}
@@ -263,7 +263,7 @@
               <button v-if="activeJob.status === 'running'" @click="cancelMigration" class="btn-secondary text-red-600">
                 {{ $t('migration.cancel') }}
               </button>
-              <button v-if="['completed', 'failed', 'cancelled'].includes(activeJob.status)" @click="resetWizard" class="btn-primary">
+              <button v-if="['completed', 'failed', 'cancelled'].includes(activeJob.status)" @click="resetWizard" class="inline-flex items-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {{ $t('migration.newMigration') }}
               </button>
             </div>
