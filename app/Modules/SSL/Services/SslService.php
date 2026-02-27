@@ -207,16 +207,28 @@ class SslService
      */
     protected function checkDnsRecord(string $domain, ?string $serverIp = null): bool
     {
-        // Try to resolve the domain
-        $records = @dns_get_record($domain, DNS_A | DNS_AAAA);
+        // Use FQDN (trailing dot) to prevent search domain suffix appending
+        $fqdn = rtrim($domain, '.') . '.';
+        $records = @dns_get_record($fqdn, DNS_A | DNS_AAAA);
 
         if (empty($records)) {
             return false;
         }
 
+        // Verify the returned hostname matches what we asked for
+        // (prevents false positives from resolv.conf search domains)
+        $validRecords = array_filter($records, function ($r) use ($domain, $fqdn) {
+            $host = rtrim($r['host'] ?? '', '.');
+            return $host === $domain || $r['host'] === $fqdn;
+        });
+
+        if (empty($validRecords)) {
+            return false;
+        }
+
         // If we have server IP, verify it matches
         if ($serverIp) {
-            foreach ($records as $record) {
+            foreach ($validRecords as $record) {
                 if (isset($record['ip']) && $record['ip'] === $serverIp) {
                     return true;
                 }
@@ -224,7 +236,6 @@ class SslService
                     return true;
                 }
             }
-            // Domain has DNS but doesn't point to this server - exclude it
             return false;
         }
 
