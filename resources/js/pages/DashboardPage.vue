@@ -39,8 +39,8 @@
       </VCard>
     </div>
 
-    <!-- Charts Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Charts Row (Admin only) -->
+    <div v-if="authStore.isAdmin" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <!-- CPU Usage Chart -->
       <VCard :title="$t('dashboard.cpuUsage')">
         <template #headerRight>
@@ -127,34 +127,34 @@
     </div>
 
     <!-- Disk Usage -->
-    <VCard :title="$t('dashboard.diskUsage')" class="mb-6">
+    <VCard :title="authStore.isAdmin ? ('dashboard.diskUsage') : ('dashboard.yourDiskUsage')" class="mb-6">
       <template v-if="dashboardStore.loading.metrics">
         <VLoadingSkeleton class="h-24" />
       </template>
       <template v-else>
-        <div class="space-y-4">
-          <div
-            v-for="(disk, index) in dashboardStore.diskUsage"
-            :key="index"
-            class="space-y-2"
-          >
+        <!-- Admin: all disk mounts -->
+        <div v-if="authStore.isAdmin" class="space-y-4">
+          <div v-for="(disk, index) in dashboardStore.diskUsage" :key="index" class="space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-700 dark:text-gray-300">{{ disk.mount }}</span>
-              <span class="text-gray-500 dark:text-gray-400">
-                {{ disk.used }} / {{ disk.total }}
-              </span>
+              <span class="text-gray-500 dark:text-gray-400">{{ disk.used }} / {{ disk.total }}</span>
             </div>
             <div class="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                :class="getDiskBarClass(disk.percentage)"
-                :style="{ width: `${disk.percentage}%` }"
-                class="h-full rounded-full transition-all duration-300"
-              />
+              <div :class="getDiskBarClass(disk.percentage)" :style="{ width: disk.percentage + '%' }" class="h-full rounded-full transition-all duration-300" />
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400 text-right">
-              {{ disk.percentage }}% {{ $t('dashboard.used') }}
-            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 text-right">{{ disk.percentage }}% {{ ('dashboard.used') }}</p>
           </div>
+        </div>
+        <!-- User: disk quota only -->
+        <div v-else class="space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-700 dark:text-gray-300">{{ ('dashboard.diskQuota') }}</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ dashboardStore.stats?.disk_used || '0 MB' }} / {{ dashboardStore.stats?.disk_quota || 'Unlimited' }}</span>
+          </div>
+          <div class="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div :class="getDiskBarClass(dashboardStore.stats?.disk_percentage || 0)" :style="{ width: (dashboardStore.stats?.disk_percentage || 0) + '%' }" class="h-full rounded-full transition-all duration-300" />
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 text-right">{{ dashboardStore.stats?.disk_percentage || 0 }}% {{ ('dashboard.used') }}</p>
         </div>
       </template>
     </VCard>
@@ -214,8 +214,8 @@
       </VCard>
     </div>
 
-    <!-- System Info & Services -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- System Info & Services (Admin only) -->
+    <div v-if="authStore.isAdmin" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <!-- System Info -->
       <VCard :title="$t('dashboard.systemInfo')">
         <template v-if="dashboardStore.loading.systemInfo">
