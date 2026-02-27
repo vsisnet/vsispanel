@@ -16,7 +16,7 @@
         <VButton variant="primary" :icon="PlusIcon" @click="openCreateModal">
           {{ $t('databases.createDatabase') }}
         </VButton>
-        <VButton variant="secondary" :icon="KeyIcon" @click="openRootPasswordModal">
+        <VButton v-if="authStore.isAdmin" variant="secondary" :icon="KeyIcon" @click="openRootPasswordModal">
           {{ $t('databases.rootPassword') }}
         </VButton>
         <VButton
