@@ -100,14 +100,14 @@
       </VButton>
     </VCard>
 
-    <!-- Bulk Actions -->
-    <div v-if="selectedIds.length > 0" class="mb-4 flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-      <span class="text-sm text-indigo-700 dark:text-indigo-300 font-medium">{{ selectedIds.length }} selected</span>
-      <button @click="bulkDelete" class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+    <!-- Bulk Actions (always visible) -->
+    <div class="mb-4 flex items-center gap-3">
+      <span class="text-sm text-gray-500 dark:text-gray-400">{{ selectedIds.length }} selected</span>
+      <button @click="bulkDelete" :disabled="selectedIds.length === 0" class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
         <TrashIcon class="w-4 h-4 mr-1" />
         Delete Selected
       </button>
-      <button @click="bulkReissue" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+      <button @click="bulkReissue" :disabled="selectedIds.length === 0" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
         <ArrowPathIcon class="w-4 h-4 mr-1" />
         Reissue Selected
       </button>
