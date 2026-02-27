@@ -253,7 +253,7 @@ class PleskMigrator extends BaseMigrator
             $dbUserName = $cleanName;
             $dbPass = bin2hex(random_bytes(12));
 
-            // Clean up soft-deleted managed_databases and managed_database_users with same name
+            // Clean up soft-deleted records
             \App\Modules\Database\Models\ManagedDatabase::withTrashed()
                 ->where('user_id', $user->id)
                 ->where('original_name', $cleanName)
@@ -262,6 +262,24 @@ class PleskMigrator extends BaseMigrator
                 ->where('user_id', $user->id)
                 ->where('original_username', $cleanName)
                 ->forceDelete();
+
+            // Also clean up active records with same name (re-migration)
+            \App\Modules\Database\Models\ManagedDatabase::where('user_id', $user->id)
+                ->where('original_name', $cleanName)
+                ->forceDelete();
+            \App\Modules\Database\Models\DatabaseUser::where('user_id', $user->id)
+                ->where('original_username', $cleanName)
+                ->forceDelete();
+
+            // Drop existing MySQL database and user (from previous failed migrations)
+            $prefix = $user->username ?? 'administrator';
+            $fullDbName = "{$prefix}_{$cleanName}";
+            $fullUserName = "{$prefix}_{$cleanName}";
+            $dropProcess = new \Symfony\Component\Process\Process(['mysql', '-e',
+                "DROP DATABASE IF EXISTS `{$fullDbName}`; DROP USER IF EXISTS '{$fullUserName}'@'localhost'; FLUSH PRIVILEGES;"
+            ]);
+            $dropProcess->setTimeout(15);
+            $dropProcess->run();
 
             $database = $dbService->createDatabase($user, $dbName, $domain);
             $dbUser = $dbService->createDatabaseUser($user, $dbUserName, $dbPass);
