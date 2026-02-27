@@ -47,8 +47,7 @@ class SslController extends Controller
             $query->expiringSoon((int) $request->expiring);
         }
 
-        $certificates = $query->orderBy('created_at', 'desc')
-            ->paginate($request->get('per_page', 15));
+        $certificates = $query->orderBy('created_at', 'desc')->get();
 
         return new SslCertificateCollection($certificates);
     }
