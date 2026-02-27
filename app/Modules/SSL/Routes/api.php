@@ -22,6 +22,10 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum'])->group(function () 
         Route::post('/domains/{domain}/custom', [SslController::class, 'uploadCustom'])
             ->name('ssl.upload-custom');
 
+        // Bulk operations (must be before /{ssl} to avoid route conflict)
+        Route::post('/bulk-delete', [SslController::class, 'bulkDelete']);
+        Route::post('/bulk-reissue', [SslController::class, 'bulkReissue']);
+
         // Single certificate operations
         Route::get('/{ssl}', [SslController::class, 'show'])->name('ssl.show');
         Route::get('/{ssl}/info', [SslController::class, 'info'])->name('ssl.info');
@@ -31,6 +35,4 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum'])->group(function () 
         Route::delete('/{ssl}', [SslController::class, 'destroy'])->name('ssl.destroy');
     });
 
-    Route::post('/ssl/bulk-delete', [SslController::class, 'bulkDelete']);
-    Route::post('/ssl/bulk-reissue', [SslController::class, 'bulkReissue']);
 });
