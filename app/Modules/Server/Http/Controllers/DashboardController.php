@@ -40,8 +40,8 @@ class DashboardController extends Controller
         if (!$isAdmin) {
             $domainQuery->where('user_id', $user->id);
             $dbQuery->where('user_id', $user->id);
-            $mailQuery->whereHas('domain', fn($q) => $q->where('user_id', $user->id));
-            $ftpQuery->whereHas('domain', fn($q) => $q->where('user_id', $user->id));
+            $mailQuery->whereHas('mailDomain.domain', fn($q) => $q->where('user_id', $user->id));
+            $ftpQuery->where('user_id', $user->id);
         }
 
         $stats = [
