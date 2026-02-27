@@ -121,11 +121,14 @@ class PleskMigrator extends BaseMigrator
                 if ($success) {
                     $job->appendLog("  Files synced successfully");
 
-                    // Fix ownership
+                    // Fix ownership and permissions
                     $chown = new \Symfony\Component\Process\Process(['chown', '-R', "{$username}:{$username}", $localPath]);
                     $chown->setTimeout(120);
                     $chown->run();
-                    $job->appendLog("  Ownership set to {$username}");
+                    $chmod = new \Symfony\Component\Process\Process(['chmod', '-R', '755', $localPath]);
+                    $chmod->setTimeout(120);
+                    $chmod->run();
+                    $job->appendLog("  Ownership set to {$username}, permissions 755");
                 } else {
                     $job->appendLog("  WARNING: File sync failed");
                 }
