@@ -49,13 +49,8 @@ class CheckModulePermission
         $user = $request->user();
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'UNAUTHENTICATED',
-                    'message' => 'Authentication required.',
-                ],
-            ], 401);
+            // Skip permission check for unauthenticated routes
+            return $next($request);
         }
 
         // Admin bypasses all permission checks

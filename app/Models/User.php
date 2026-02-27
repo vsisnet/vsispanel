@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasUuids, Notifiable, SoftDeletes;
+    use HasFactory, HasUuids, Notifiable, SoftDeletes, HasRoles;
+    protected $guard_name = 'sanctum';
 
     /**
      * The attributes that are mass assignable.
@@ -46,6 +48,22 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    /**
+     * Check if user is admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is reseller.
+     */
+    public function isReseller(): bool
+    {
+        return $this->role === 'reseller';
+    }
+
     protected function casts(): array
     {
         return [

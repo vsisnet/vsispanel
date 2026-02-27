@@ -19,7 +19,7 @@
 
     <!-- Navigation -->
     <nav class="flex-1 overflow-y-auto py-2">
-      <div v-for="group in navigationGroups" :key="group.name" class="mb-1">
+      <div v-for="group in filteredNavigationGroups" :key="group.name" class="mb-1">
         <!-- Collapsed mode: Show items without group headers -->
         <template v-if="collapsed">
           <ul class="space-y-1 px-2">
@@ -194,10 +194,10 @@ const navigationGroups = [
       { name: 'email', route: 'email', label: 'nav.email', icon: EnvelopeIcon, permission: 'mail.view' },
       { name: 'dns', route: 'dns', label: 'nav.dns', icon: ServerStackIcon, permission: 'dns.view' },
       { name: 'cron', route: 'cron', label: 'nav.cronJobs', icon: ClockIcon, permission: 'cron.view' },
-      { name: 'terminal', route: 'terminal', label: 'nav.terminal', icon: CommandLineIcon, permission: 'terminal.access' },
+      { name: 'terminal', route: 'terminal', label: 'nav.terminal', icon: CommandLineIcon, permission: 'terminal.access', adminOnly: true },
       { name: 'marketplace', route: 'marketplace', label: 'nav.marketplace', icon: RocketLaunchIcon },
       { name: 'tasks', route: 'tasks', label: 'nav.tasks', icon: ClipboardDocumentListIcon, permission: 'tasks.view' },
-      { name: 'migration', route: 'migration', label: 'nav.migration', icon: ArrowsRightLeftIcon, permission: 'server.manage' }
+      { name: 'migration', route: 'migration', label: 'nav.migration', icon: ArrowsRightLeftIcon, permission: 'server.manage', adminOnly: true }
     ]
   },
   {
@@ -207,7 +207,7 @@ const navigationGroups = [
       { name: 'users', route: 'users', label: 'nav.users', icon: UsersIcon, permission: 'users.view' },
       { name: 'hosting', route: 'hosting', label: 'nav.hosting', icon: CubeIcon, permission: 'hosting.view' },
       { name: 'reseller', route: 'reseller', label: 'nav.reseller', icon: BuildingOffice2Icon, permission: 'reseller.view' },
-      { name: 'settings', route: 'settings', label: 'nav.settings', icon: Cog6ToothIcon }
+      { name: 'settings', route: 'settings', label: 'nav.settings', icon: Cog6ToothIcon, adminOnly: true }
     ]
   }
 ]
@@ -252,9 +252,20 @@ function isActive(routeName) {
 }
 
 function shouldShowItem(item) {
+  if (item.adminOnly && !authStore.isAdmin) return false
   if (!item.permission) return true
   return authStore.hasPermission(item.permission)
 }
+
+// Filter navigation groups to hide empty ones
+const filteredNavigationGroups = computed(() => {
+  return navigationGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => shouldShowItem(item))
+    }))
+    .filter(group => group.items.length > 0)
+})
 
 function toggleCollapse() {
   appStore.toggleSidebar()
