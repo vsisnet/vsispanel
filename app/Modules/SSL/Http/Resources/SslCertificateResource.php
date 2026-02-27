@@ -15,6 +15,10 @@ class SslCertificateResource extends JsonResource
             'id' => $this->id,
             'domain_id' => $this->domain_id,
             'domain' => $this->whenLoaded('domain', fn () => [
+                'user' => $this->domain->user ? [
+                    'name' => $this->domain->user->name,
+                    'username' => $this->domain->user->username,
+                ] : null,
                 'id' => $this->domain->id,
                 'name' => $this->domain->name,
             ]),

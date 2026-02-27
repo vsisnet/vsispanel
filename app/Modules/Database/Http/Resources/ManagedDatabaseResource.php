@@ -24,6 +24,11 @@ class ManagedDatabaseResource extends JsonResource
             'collation' => $this->collation,
             'status' => $this->status,
             'notes' => $this->notes,
+            'user' => $this->whenLoaded('user', fn() => [
+                'id' => $this->user->id,
+                'name' => $this->user->name,
+                'username' => $this->user->username,
+            ]),
             'domain' => $this->whenLoaded('domain', fn() => [
                 'id' => $this->domain->id,
                 'name' => $this->domain->name,
