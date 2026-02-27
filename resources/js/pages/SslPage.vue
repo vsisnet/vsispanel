@@ -100,21 +100,20 @@
       </VButton>
     </VCard>
 
-    <!-- Bulk Actions (always visible) -->
-    <div class="mb-4 flex items-center gap-3">
-      <span class="text-sm text-gray-500 dark:text-gray-400">{{ selectedIds.length }} selected</span>
-      <button @click="bulkDelete" :disabled="selectedIds.length === 0" class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
-        <TrashIcon class="w-4 h-4 mr-1" />
-        Delete Selected
-      </button>
-      <button @click="bulkReissue" :disabled="selectedIds.length === 0" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
-        <ArrowPathIcon class="w-4 h-4 mr-1" />
-        Reissue Selected
-      </button>
-    </div>
-
     <!-- Certificates Table -->
     <VCard v-else>
+      <!-- Bulk Actions -->
+      <div class="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700">
+        <span class="text-sm text-gray-500 dark:text-gray-400">{{ selectedIds.length }} selected</span>
+        <button @click="bulkDelete" :disabled="selectedIds.length === 0" class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+          <TrashIcon class="w-4 h-4 mr-1" />
+          Delete Selected
+        </button>
+        <button @click="bulkReissue" :disabled="selectedIds.length === 0" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+          <ArrowPathIcon class="w-4 h-4 mr-1" />
+          Reissue Selected
+        </button>
+      </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
