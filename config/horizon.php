@@ -230,8 +230,8 @@ return [
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 256,
-            'tries' => 1,
-            'timeout' => 900, // 15 minutes for app installs
+            'tries' => 3,
+            'timeout' => 7200, // 2 hours for migrations
             'nice' => 0,
         ],
     ],

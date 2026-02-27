@@ -18,7 +18,8 @@ class RunMigrationJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 7200; // 2 hours
-    public int $tries = 1;
+    public int $maxExceptions = 3;
+    public int $tries = 3;
 
     public function __construct(
         public MigrationJob $migrationJob
