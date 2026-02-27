@@ -142,37 +142,41 @@ abstract class BaseMigrator implements MigratorInterface
      */
     protected function importDatabase(string $dbName, string $sqlFile, ?MigrationJob $job = null): bool
     {
-        // Ensure database exists using both Laravel DB and CLI
-        try {
-            \Illuminate\Support\Facades\DB::unprepared("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-            $job?->appendLog("  Database {$dbName} ensured via DB::unprepared");
-        } catch (\Exception $e) {
-            $job?->appendLog("  DB::unprepared CREATE failed: {$e->getMessage()}, trying CLI...");
-            $process = new Process(['mysql', '-e', "CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"]);
-            $process->setTimeout(30);
-            $process->run();
-            if (!$process->isSuccessful()) {
-                $job?->appendLog("  CLI CREATE also failed: {$process->getErrorOutput()}");
-                return false;
-            }
-        }
+        // Step 1: Create database using CLI mysql (reliable, runs as root)
+        $createProcess = Process::fromShellCommandline(
+            "mysql -e " . escapeshellarg("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+        );
+        $createProcess->setTimeout(30);
+        $createProcess->run();
 
-        // Verify database actually exists before import
-        $check = new Process(['mysql', '-N', '-e', "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = " . escapeshellarg($dbName)]);
-        $check->setTimeout(10);
-        $check->run();
-        if (trim($check->getOutput()) !== $dbName) {
-            $job?->appendLog("  CRITICAL: Database {$dbName} still does not exist after creation!");
+        if (!$createProcess->isSuccessful()) {
+            $job?->appendLog("  Failed to create DB via CLI: {$createProcess->getErrorOutput()}");
             return false;
         }
 
-        // Import SQL file
-        $process = Process::fromShellCommandline("mysql " . escapeshellarg($dbName) . " < " . escapeshellarg($sqlFile));
-        $process->setTimeout(3600);
-        $process->run();
+        // Step 2: Verify database exists
+        $verifyProcess = Process::fromShellCommandline(
+            "mysql -N -e " . escapeshellarg("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='{$dbName}'")
+        );
+        $verifyProcess->setTimeout(10);
+        $verifyProcess->run();
+        $count = trim($verifyProcess->getOutput());
+        $job?->appendLog("  DB verify: {$dbName} exists={$count}");
 
-        if (!$process->isSuccessful()) {
-            $job?->appendLog("Failed to import database {$dbName}: {$process->getErrorOutput()}");
+        if ($count !== '1') {
+            $job?->appendLog("  CRITICAL: Database {$dbName} does not exist after CREATE!");
+            return false;
+        }
+
+        // Step 3: Import SQL file
+        $importProcess = Process::fromShellCommandline(
+            "mysql " . escapeshellarg($dbName) . " < " . escapeshellarg($sqlFile)
+        );
+        $importProcess->setTimeout(3600);
+        $importProcess->run();
+
+        if (!$importProcess->isSuccessful()) {
+            $job?->appendLog("Failed to import database {$dbName}: {$importProcess->getErrorOutput()}");
             return false;
         }
 
