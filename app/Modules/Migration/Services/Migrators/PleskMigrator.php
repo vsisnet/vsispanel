@@ -232,75 +232,65 @@ class PleskMigrator extends BaseMigrator
     }
 
     /**
-     * Create a local database + user for the migrated site.
+     * Create database + user using original names from source.
+     * Simple: DROP IF EXISTS → CREATE DB → CREATE USER → GRANT → Register in panel.
      */
-    /**
-     * Create database with a meaningful name based on domain.
-     */
-    /**
-     * Create database + user using original names from source server.
-     * No prefix, no renaming — just replicate the source DB setup.
-     */
-    private function createDatabaseFromSource(string $dbName, string $dbUser, ?object $domain = null, ?MigrationJob $job = null): ?array
+    private function createDatabaseFromSource(string $dbName, string $dbUser, object $domain, MigrationJob $job): ?array
     {
         $dbPass = bin2hex(random_bytes(12));
 
-        // Drop existing (from previous migration attempts)
-        $drop = new \Symfony\Component\Process\Process(['mysql', '-e',
-            "DROP DATABASE IF EXISTS `{$dbName}`; DROP USER IF EXISTS '{$dbUser}'@'localhost'; FLUSH PRIVILEGES;"
-        ]);
-        $drop->setTimeout(15);
-        $drop->run();
+        // 1. Clean slate: drop old DB + user from previous attempts
+        $this->mysqlExec("DROP DATABASE IF EXISTS `{$dbName}`");
+        $this->mysqlExec("DROP USER IF EXISTS '{$dbUser}'@'localhost'");
 
-        // Create database
-        $create = new \Symfony\Component\Process\Process(['mysql', '-e',
-            "CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-        ]);
-        $create->setTimeout(15);
-        $create->run();
-
-        if (!$create->isSuccessful()) {
-            $job?->appendLog("  Failed to create database {$dbName}: {$create->getErrorOutput()}");
+        // 2. Create database
+        if (!$this->mysqlExec("CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")) {
+            $job->appendLog("  FAILED: Could not create database {$dbName}");
             return null;
         }
 
-        // Create user + grant
-        $userSql = "CREATE USER '{$dbUser}'@'localhost' IDENTIFIED BY '{$dbPass}'; "
-                 . "GRANT ALL PRIVILEGES ON `{$dbName}`.* TO '{$dbUser}'@'localhost'; "
-                 . "FLUSH PRIVILEGES;";
-        $userProcess = new \Symfony\Component\Process\Process(['mysql', '-e', $userSql]);
-        $userProcess->setTimeout(15);
-        $userProcess->run();
+        // 3. Create user + grant all on this database
+        $this->mysqlExec("CREATE USER '{$dbUser}'@'localhost' IDENTIFIED BY '{$dbPass}'");
+        $this->mysqlExec("GRANT ALL PRIVILEGES ON `{$dbName}`.* TO '{$dbUser}'@'localhost'");
+        $this->mysqlExec("FLUSH PRIVILEGES");
 
-        if (!$userProcess->isSuccessful()) {
-            $job?->appendLog("  Failed to create user {$dbUser}: {$userProcess->getErrorOutput()}");
-            // DB created but user failed — still return with root access
-        }
-
-        // Register in VsisPanel managed_databases so it shows in UI
+        // 4. Register in VsisPanel (so it shows in Databases UI)
         try {
-            \App\Modules\Database\Models\ManagedDatabase::updateOrCreate(
-                ['name' => $dbName],
-                [
-                    'user_id' => $domain?->user_id,
-                    'domain_id' => $domain?->id,
-                    'original_name' => $dbName,
-                    'size_bytes' => 0,
-                    'charset' => 'utf8mb4',
-                    'collation' => 'utf8mb4_unicode_ci',
-                    'status' => 'active',
-                ]
-            );
-            \App\Modules\Database\Models\DatabaseUser::updateOrCreate(
-                ['username' => $dbUser],
-                [
-                    'user_id' => $domain?->user_id,
-                    'original_username' => $dbUser,
-                    'host' => 'localhost',
-                ]
-            );
+            $domain->loadMissing('user');
+
+            // Clean old panel records
+            \App\Modules\Database\Models\ManagedDatabase::withTrashed()->where('name', $dbName)->forceDelete();
+            \App\Modules\Database\Models\DatabaseUser::withTrashed()->where('username', $dbUser)->forceDelete();
+
+            $database = \App\Modules\Database\Models\ManagedDatabase::create([
+                'user_id' => $domain->user_id,
+                'domain_id' => $domain->id,
+                'name' => $dbName,
+                'original_name' => $dbName,
+                'size_bytes' => 0,
+                'charset' => 'utf8mb4',
+                'collation' => 'utf8mb4_unicode_ci',
+                'status' => 'active',
+            ]);
+
+            $dbUserRecord = \App\Modules\Database\Models\DatabaseUser::create([
+                'user_id' => $domain->user_id,
+                'username' => $dbUser,
+                'original_username' => $dbUser,
+                'host' => 'localhost',
+                'password_encrypted' => encrypt($dbPass),
+            ]);
+
+            // Link database ↔ user via pivot
+            \Illuminate\Support\Facades\DB::table('database_database_user')->insert([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'managed_database_id' => $database->id,
+                'database_user_id' => $dbUserRecord->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         } catch (\Exception $e) {
-            $job?->appendLog("  Warning: Could not register DB in panel: {$e->getMessage()}");
+            $job->appendLog("  Warning: Panel registration failed: {$e->getMessage()}");
         }
 
         return [
@@ -311,125 +301,18 @@ class PleskMigrator extends BaseMigrator
         ];
     }
 
-        private function createLocalDatabaseWithName(object $domain, string $cleanName, ?MigrationJob $job = null): ?array
-    {
-        try {
-            $dbService = app(\App\Modules\Database\Services\DatabaseService::class);
-            $domain->loadMissing('user');
-            $user = $domain->user;
-
-            if (!$user) {
-                $job?->appendLog("WARNING: Domain has no user, using direct DB creation");
-                return $this->createDatabaseDirect($cleanName, $job);
-            }
-
-            // MySQL username max 32 chars. Prefix "administrator_" = 14 chars, so name max 18
-            $prefix = $user->username ?? 'administrator';
-            $maxLen = 32 - strlen($prefix) - 1; // -1 for underscore
-            $dbName = substr($cleanName, 0, $maxLen);
-            $dbUserName = substr($cleanName, 0, $maxLen);
-            $dbPass = bin2hex(random_bytes(12));
-
-            // Clean up soft-deleted records
-            \App\Modules\Database\Models\ManagedDatabase::withTrashed()
-                ->where('user_id', $user->id)
-                ->where('original_name', $cleanName)
-                ->forceDelete();
-            \App\Modules\Database\Models\DatabaseUser::withTrashed()
-                ->where('user_id', $user->id)
-                ->where('original_username', $cleanName)
-                ->forceDelete();
-
-            // Also clean up active records with same name (re-migration)
-            \App\Modules\Database\Models\ManagedDatabase::where('user_id', $user->id)
-                ->where('original_name', $cleanName)
-                ->forceDelete();
-            \App\Modules\Database\Models\DatabaseUser::where('user_id', $user->id)
-                ->where('original_username', $cleanName)
-                ->forceDelete();
-
-            // Drop existing MySQL database and user (from previous failed migrations)
-            $fullDbName = "{$prefix}_{$dbName}";
-            $fullUserName = "{$prefix}_{$dbUserName}";
-            $dropProcess = new \Symfony\Component\Process\Process(['mysql', '-e',
-                "DROP DATABASE IF EXISTS `{$fullDbName}`; DROP USER IF EXISTS '{$fullUserName}'@'localhost'; FLUSH PRIVILEGES;"
-            ]);
-            $dropProcess->setTimeout(15);
-            $dropProcess->run();
-
-            $database = $dbService->createDatabase($user, $dbName, $domain);
-            $dbUser = $dbService->createDatabaseUser($user, $dbUserName, $dbPass);
-            $dbService->grantAccess($dbUser, $database);
-
-            return [
-                'db_name' => $database->name,
-                'db_user' => $dbUser->username,
-                'db_pass' => $dbPass,
-                'db_host' => 'localhost',
-            ];
-        } catch (\Exception $e) {
-            $job?->appendLog("DatabaseService error: {$e->getMessage()}");
-            // Fallback to direct MySQL creation
-            return $this->createDatabaseDirect($cleanName, $job);
-        }
-    }
-
-        private function createLocalDatabase(object $domain, string $originalDbName, ?MigrationJob $job = null): ?array
-    {
-        try {
-            $dbService = app(\App\Modules\Database\Services\DatabaseService::class);
-
-            $shortHash = substr(md5($originalDbName), 0, 8);
-            $dbName = "mig{$shortHash}";
-            $dbUserName = "mig{$shortHash}";
-            $dbPass = bin2hex(random_bytes(12));
-
-            $database = $dbService->createDatabase($domain->user, $dbName, $domain);
-            $dbUser = $dbService->createDatabaseUser($domain->user, $dbUserName, $dbPass);
-            $dbService->grantAccess($dbUser, $database);
-
-            $job?->appendLog("Created database: {$database->name}, user: {$dbUser->username}");
-
-            return [
-                'db_name' => $database->name,
-                'db_user' => $dbUser->username,
-                'db_pass' => $dbPass,
-                'db_host' => 'localhost',
-            ];
-        } catch (\Exception $e) {
-            $job?->appendLog("Failed to create database via DatabaseService: {$e->getMessage()}");
-            return $this->createDatabaseDirect($originalDbName, $job);
-        }
-    }
-
     /**
-     * Fallback: create database directly via MySQL CLI.
+     * Execute a MySQL statement via CLI (runs as root).
      */
-    private function createDatabaseDirect(string $originalDbName, ?MigrationJob $job = null): ?array
+    private function mysqlExec(string $sql): bool
     {
-        $dbName = 'mig_' . substr(md5($originalDbName . time()), 0, 12);
-        $dbUser = $dbName;
-        $dbPass = bin2hex(random_bytes(12));
-
-        $sql = "CREATE DATABASE IF NOT EXISTS `{$dbName}`; "
-             . "CREATE USER IF NOT EXISTS '{$dbUser}'@'localhost' IDENTIFIED BY '{$dbPass}'; "
-             . "GRANT ALL PRIVILEGES ON `{$dbName}`.* TO '{$dbUser}'@'localhost'; "
-             . "FLUSH PRIVILEGES;";
-
         $process = new \Symfony\Component\Process\Process(['mysql', '-e', $sql]);
         $process->setTimeout(30);
         $process->run();
-
-        if ($process->isSuccessful()) {
-            $job?->appendLog("Created database (direct): {$dbName}");
-            return ['db_name' => $dbName, 'db_user' => $dbUser, 'db_pass' => $dbPass, 'db_host' => 'localhost'];
-        }
-
-        $job?->appendLog("Failed to create database directly: {$process->getErrorOutput()}");
-        return null;
+        return $process->isSuccessful();
     }
 
-    /**
+        /**
      * Update wp-config.php with new database credentials.
      */
     private function updateWpConfig(string $localPath, array $dbCredentials, ?MigrationJob $job = null): void
