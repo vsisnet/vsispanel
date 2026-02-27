@@ -1,17 +1,21 @@
 #!/bin/bash
 # VSISPanel - Let's Encrypt SSL Renewal Script
-# Usage: /opt/vsispanel/scripts/renew-ssl.sh
-# Log: /var/log/vsispanel/ssl-renew.log
+# Runs as any user — uses sudo for certbot + nginx if needed
+# Log: /opt/vsispanel/storage/logs/ssl-renew.log
 
-LOG_DIR="/var/log/vsispanel"
-LOG_FILE="$LOG_DIR/ssl-renew.log"
+PANEL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LOG_FILE="$PANEL_DIR/storage/logs/ssl-renew.log"
 MAX_LOG_SIZE=5242880 # 5MB
 
-mkdir -p "$LOG_DIR"
-
 # Rotate log if too large
-if [ -f "$LOG_FILE" ] && [ "$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null)" -gt "$MAX_LOG_SIZE" ]; then
+if [ -f "$LOG_FILE" ] && [ "$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)" -gt "$MAX_LOG_SIZE" ]; then
     mv "$LOG_FILE" "$LOG_FILE.old"
+fi
+
+# Use sudo if not root
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    SUDO="sudo"
 fi
 
 {
@@ -28,12 +32,12 @@ fi
     # List certificates before renewal
     echo ""
     echo "[INFO] Current certificates:"
-    certbot certificates 2>&1 | grep -E "(Certificate Name|Expiry Date|Domains)" | sed 's/^/  /'
+    $SUDO certbot certificates 2>&1 | grep -E "(Certificate Name|Expiry Date|Domains)" | sed 's/^/  /'
 
     # Run renewal
     echo ""
     echo "[INFO] Running certbot renew..."
-    RENEW_OUTPUT=$(certbot renew --deploy-hook "systemctl reload nginx" 2>&1)
+    RENEW_OUTPUT=$($SUDO certbot renew --deploy-hook "$SUDO systemctl reload nginx" 2>&1)
     RENEW_EXIT=$?
 
     echo "$RENEW_OUTPUT"
@@ -45,6 +49,9 @@ fi
         else
             echo ""
             echo "[OK] Renewal completed successfully. Nginx reloaded."
+
+            # Update VsisPanel database with new cert info
+            cd "$PANEL_DIR" && php artisan ssl:sync-certificates 2>/dev/null || true
         fi
     else
         echo ""
@@ -56,5 +63,5 @@ fi
     echo ""
 } >> "$LOG_FILE" 2>&1
 
-# Also output to stdout for cron job output capture
+# Output to stdout for cron job capture
 tail -n 20 "$LOG_FILE"
