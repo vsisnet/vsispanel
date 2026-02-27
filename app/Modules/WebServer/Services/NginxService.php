@@ -214,6 +214,9 @@ class NginxService
      */
     public function testConfig(): bool
     {
+        // Clean broken symlinks before testing (prevents cascade failures)
+        $this->cleanBrokenSymlinks();
+
         $result = $this->executor->executeAsRoot('nginx', ['-t']);
 
         if (!$result->success) {
@@ -223,6 +226,16 @@ class NginxService
         }
 
         return $result->success;
+    }
+
+    /**
+     * Remove broken symlinks in sites-enabled to prevent cascade failures.
+     */
+    protected function cleanBrokenSymlinks(): void
+    {
+        $this->executor->executeAsRoot('find', [
+            $this->sitesEnabled, '-maxdepth', '1', '-xtype', 'l', '-delete'
+        ]);
     }
 
     /**
@@ -480,17 +493,16 @@ class NginxService
      */
     protected function rollback(string $configPath, string $enabledPath): void
     {
-        // Remove failed configuration
-        if ($this->fileExists($configPath)) {
-            $this->executor->executeAsRoot('rm', ['-f', $configPath]);
-        }
+        // Remove failed configuration (force, no check - file may or may not exist)
+        $this->executor->executeAsRoot('rm', ['-f', $configPath]);
 
-        // Remove symlink
-        if ($this->fileExists($enabledPath)) {
-            $this->executor->executeAsRoot('rm', ['-f', $enabledPath]);
-        }
+        // Remove symlink (force - broken symlinks return false for file_exists)
+        $this->executor->executeAsRoot('rm', ['-f', $enabledPath]);
 
-        Log::channel('commands')->warning('Nginx config rolled back');
+        Log::channel('commands')->warning('Nginx config rolled back', [
+            'config' => $configPath,
+            'enabled' => $enabledPath,
+        ]);
     }
 
     /**
