@@ -172,6 +172,13 @@ abstract class BaseMigrator implements MigratorInterface
     protected function createDomain(string $domainName, string $userId, ?MigrationJob $job = null): ?object
     {
         try {
+            // Check if domain already exists
+            $existing = \App\Modules\Domain\Models\Domain::where('name', $domainName)->first();
+            if ($existing) {
+                $job?->appendLog("Domain {$domainName} already exists, reusing");
+                return $existing;
+            }
+
             $domainService = app(\App\Modules\Domain\Services\DomainService::class);
             $user = \App\Modules\Auth\Models\User::findOrFail($userId);
 
@@ -185,6 +192,12 @@ abstract class BaseMigrator implements MigratorInterface
             $job?->appendLog("Domain {$domainName} created in VSISPanel");
             return $domain;
         } catch (\Exception $e) {
+            // One more try: maybe race condition, check again
+            $existing = \App\Modules\Domain\Models\Domain::where('name', $domainName)->first();
+            if ($existing) {
+                $job?->appendLog("Domain {$domainName} already exists, reusing");
+                return $existing;
+            }
             $job?->appendLog("Failed to create domain {$domainName}: {$e->getMessage()}");
             return null;
         }
