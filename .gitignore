@@ -42,6 +42,4 @@ storage/logs/*.log
 
 # Claude / Project docs
 .claude/settings.local.json
-CLAUDE.md
-CONTEXT.md
 /docs/
