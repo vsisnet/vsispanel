@@ -169,19 +169,39 @@ abstract class BaseMigrator implements MigratorInterface
     /**
      * Create a VSISPanel domain using DomainService.
      */
-    protected function createDomain(string $domainName, string $userId, ?MigrationJob $job = null): ?object
+    /**
+     * Ensure nginx config exists for a domain.
+     */
+    protected function ensureNginxConfig(object $domain, ?MigrationJob $job = null): void
+    {
+        try {
+            $nginxService = app(\App\Modules\WebServer\Services\NginxService::class);
+            $configPath = "/etc/nginx/sites-available/{$domain->name}.conf";
+            if (!file_exists($configPath)) {
+                $nginxService->createVhost($domain);
+                $job?->appendLog("Nginx config created for {$domain->name}");
+            }
+        } catch (\Exception $e) {
+            $job?->appendLog("Nginx config warning: {$e->getMessage()}");
+        }
+    }
+
+        protected function createDomain(string $domainName, string $userId, ?MigrationJob $job = null): ?object
     {
         try {
             // Check if domain already exists (including soft-deleted)
             $existing = \App\Modules\Domain\Models\Domain::withTrashed()->where('name', $domainName)->first();
             if ($existing) {
                 if ($existing->trashed()) {
-                    $existing->restore();
-                    $job?->appendLog("Domain {$domainName} was deleted, restored");
+                    // Force delete the old record completely so we can create fresh
+                    $existing->forceDelete();
+                    $job?->appendLog("Domain {$domainName} old record removed, creating fresh");
                 } else {
+                    // Rebuild nginx config if missing
+                    $this->ensureNginxConfig($existing, $job);
                     $job?->appendLog("Domain {$domainName} already exists, reusing");
+                    return $existing;
                 }
-                return $existing;
             }
 
             $domainService = app(\App\Modules\Domain\Services\DomainService::class);
@@ -200,9 +220,12 @@ abstract class BaseMigrator implements MigratorInterface
             // One more try: maybe race condition, check again
             $existing = \App\Modules\Domain\Models\Domain::withTrashed()->where('name', $domainName)->first();
             if ($existing) {
-                if ($existing->trashed()) $existing->restore();
-                $job?->appendLog("Domain {$domainName} recovered after error, reusing");
-                return $existing;
+                if ($existing->trashed()) $existing->forceDelete();
+                else {
+                    $this->ensureNginxConfig($existing, $job);
+                    $job?->appendLog("Domain {$domainName} recovered after error, reusing");
+                    return $existing;
+                }
             }
             $job?->appendLog("Failed to create domain {$domainName}: {$e->getMessage()}");
             return null;

@@ -250,6 +250,16 @@ class PleskMigrator extends BaseMigrator
             $dbUserName = $cleanName;
             $dbPass = bin2hex(random_bytes(12));
 
+            // Clean up soft-deleted managed_databases and managed_database_users with same name
+            \App\Modules\Database\Models\ManagedDatabase::withTrashed()
+                ->where('user_id', $user->id)
+                ->where('original_name', $cleanName)
+                ->forceDelete();
+            \App\Modules\Database\Models\ManagedDatabaseUser::withTrashed()
+                ->where('user_id', $user->id)
+                ->where('original_name', $cleanName)
+                ->forceDelete();
+
             $database = $dbService->createDatabase($user, $dbName, $domain);
             $dbUser = $dbService->createDatabaseUser($user, $dbUserName, $dbPass);
             $dbService->grantAccess($dbUser, $database);
