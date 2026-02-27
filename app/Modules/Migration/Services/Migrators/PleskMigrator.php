@@ -94,10 +94,10 @@ class PleskMigrator extends BaseMigrator
                 // ─── STEP 3: Create database + user on VsisPanel ───
                 $job->appendLog("[Step 3] Creating database and user...");
 
-                // Use clean name based on domain
-                $cleanName = str_replace(['.', '-'], '_', $domainName);
-                $cleanName = substr($cleanName, 0, 40);
-                $dbResult = $this->createLocalDatabaseWithName($domain, $cleanName, $job);
+                // Use original database name from source (Plesk)
+                $originalDbName = $wpConfig['db_name'];
+                $originalDbUser = $wpConfig['db_user'] ?? $originalDbName;
+                $dbResult = $this->createDatabaseFromSource($originalDbName, $originalDbUser, $job);
 
                 if ($dbResult) {
                     $job->appendLog("  Database: {$dbResult['db_name']}");
@@ -237,7 +237,55 @@ class PleskMigrator extends BaseMigrator
     /**
      * Create database with a meaningful name based on domain.
      */
-    private function createLocalDatabaseWithName(object $domain, string $cleanName, ?MigrationJob $job = null): ?array
+    /**
+     * Create database + user using original names from source server.
+     * No prefix, no renaming — just replicate the source DB setup.
+     */
+    private function createDatabaseFromSource(string $dbName, string $dbUser, ?MigrationJob $job = null): ?array
+    {
+        $dbPass = bin2hex(random_bytes(12));
+
+        // Drop existing (from previous migration attempts)
+        $drop = new \Symfony\Component\Process\Process(['mysql', '-e',
+            "DROP DATABASE IF EXISTS `{$dbName}`; DROP USER IF EXISTS '{$dbUser}'@'localhost'; FLUSH PRIVILEGES;"
+        ]);
+        $drop->setTimeout(15);
+        $drop->run();
+
+        // Create database
+        $create = new \Symfony\Component\Process\Process(['mysql', '-e',
+            "CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+        ]);
+        $create->setTimeout(15);
+        $create->run();
+
+        if (!$create->isSuccessful()) {
+            $job?->appendLog("  Failed to create database {$dbName}: {$create->getErrorOutput()}");
+            return null;
+        }
+
+        // Create user + grant
+        $userSql = "CREATE USER '{$dbUser}'@'localhost' IDENTIFIED BY '{$dbPass}'; "
+                 . "GRANT ALL PRIVILEGES ON `{$dbName}`.* TO '{$dbUser}'@'localhost'; "
+                 . "FLUSH PRIVILEGES;";
+        $userProcess = new \Symfony\Component\Process\Process(['mysql', '-e', $userSql]);
+        $userProcess->setTimeout(15);
+        $userProcess->run();
+
+        if (!$userProcess->isSuccessful()) {
+            $job?->appendLog("  Failed to create user {$dbUser}: {$userProcess->getErrorOutput()}");
+            // DB created but user failed — still return with root access
+        }
+
+        return [
+            'db_name' => $dbName,
+            'db_user' => $dbUser,
+            'db_pass' => $dbPass,
+            'db_host' => 'localhost',
+        ];
+    }
+
+        private function createLocalDatabaseWithName(object $domain, string $cleanName, ?MigrationJob $job = null): ?array
     {
         try {
             $dbService = app(\App\Modules\Database\Services\DatabaseService::class);
