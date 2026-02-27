@@ -172,10 +172,15 @@ abstract class BaseMigrator implements MigratorInterface
     protected function createDomain(string $domainName, string $userId, ?MigrationJob $job = null): ?object
     {
         try {
-            // Check if domain already exists
-            $existing = \App\Modules\Domain\Models\Domain::where('name', $domainName)->first();
+            // Check if domain already exists (including soft-deleted)
+            $existing = \App\Modules\Domain\Models\Domain::withTrashed()->where('name', $domainName)->first();
             if ($existing) {
-                $job?->appendLog("Domain {$domainName} already exists, reusing");
+                if ($existing->trashed()) {
+                    $existing->restore();
+                    $job?->appendLog("Domain {$domainName} was deleted, restored");
+                } else {
+                    $job?->appendLog("Domain {$domainName} already exists, reusing");
+                }
                 return $existing;
             }
 
@@ -193,9 +198,10 @@ abstract class BaseMigrator implements MigratorInterface
             return $domain;
         } catch (\Exception $e) {
             // One more try: maybe race condition, check again
-            $existing = \App\Modules\Domain\Models\Domain::where('name', $domainName)->first();
+            $existing = \App\Modules\Domain\Models\Domain::withTrashed()->where('name', $domainName)->first();
             if ($existing) {
-                $job?->appendLog("Domain {$domainName} already exists, reusing");
+                if ($existing->trashed()) $existing->restore();
+                $job?->appendLog("Domain {$domainName} recovered after error, reusing");
                 return $existing;
             }
             $job?->appendLog("Failed to create domain {$domainName}: {$e->getMessage()}");
