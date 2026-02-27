@@ -83,38 +83,6 @@
       </VButton>
     </div>
 
-    <!-- Bulk Actions Toolbar -->
-    <div v-if="selectedCertificates.length > 0" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <span class="text-sm font-medium text-blue-900 dark:text-blue-200 mr-4">
-            {{ selectedCertificates.length }} certificate(s) selected
-          </span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <VButton
-            variant="secondary"
-            size="sm"
-            :loading="bulkReissuing"
-            :disabled="!canBulkReissue"
-            @click="bulkReissueCertificates"
-          >
-            <ArrowPathIcon class="w-4 h-4 mr-2" />
-            Reissue Selected
-          </VButton>
-          <VButton
-            variant="danger"
-            size="sm"
-            :loading="bulkDeleting"
-            @click="bulkDeleteCertificates"
-          >
-            <TrashIcon class="w-4 h-4 mr-2" />
-            Delete Selected
-          </VButton>
-        </div>
-      </div>
-    </div>
-
     <!-- Loading State -->
     <VLoadingSkeleton v-if="loading" class="h-96" />
 
@@ -132,19 +100,27 @@
       </VButton>
     </VCard>
 
+    <!-- Bulk Actions -->
+    <div v-if="selectedIds.length > 0" class="mb-4 flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+      <span class="text-sm text-indigo-700 dark:text-indigo-300 font-medium">{{ selectedIds.length }} selected</span>
+      <button @click="bulkDelete" class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+        <TrashIcon class="w-4 h-4 mr-1" />
+        Delete Selected
+      </button>
+      <button @click="bulkReissue" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+        <ArrowPathIcon class="w-4 h-4 mr-1" />
+        Reissue Selected
+      </button>
+    </div>
+
     <!-- Certificates Table -->
     <VCard v-else>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
             <tr>
-              <th class="px-6 py-3 text-left">
-                <input
-                  type="checkbox"
-                  :checked="isAllSelected"
-                  @change="toggleSelectAll"
-                  class="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
-                />
+              <th class="px-4 py-3 w-10">
+                <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500" />
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Domain
@@ -171,13 +147,8 @@
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             <tr v-for="cert in filteredCertificates" :key="cert.id" class="hover:bg-gray-50 dark:hover:bg-gray-800">
-              <td class="px-6 py-4 whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  :value="cert.id"
-                  v-model="selectedCertificates"
-                  class="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
-                />
+              <td class="px-4 py-4 w-10">
+                <input type="checkbox" :value="cert.id" v-model="selectedIds" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500" />
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
@@ -363,7 +334,9 @@
       @confirm="deleteCert"
     />
   </div>
-</template><script setup>
+</template>
+
+<script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -392,14 +365,11 @@ const appStore = useAppStore()
 // State
 const loading = ref(false)
 const certificates = ref([])
+const selectedIds = ref([])
+const selectAll = ref(false)
 const domains = ref([])
 const search = ref('')
 const statusFilter = ref('')
-
-// Bulk Actions
-const selectedCertificates = ref([])
-const bulkDeleting = ref(false)
-const bulkReissuing = ref(false)
 
 // Modals
 const showIssueModal = ref(false)
@@ -441,18 +411,6 @@ const filteredCertificates = computed(() => {
   return result
 })
 
-const isAllSelected = computed(() => {
-  return filteredCertificates.value.length > 0 && 
-    selectedCertificates.value.length === filteredCertificates.value.length
-})
-
-const canBulkReissue = computed(() => {
-  if (selectedCertificates.value.length === 0) return false
-  return certificates.value
-    .filter(c => selectedCertificates.value.includes(c.id))
-    .every(c => c.type === 'lets_encrypt')
-})
-
 // Methods
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : ''
@@ -465,78 +423,67 @@ function formatDate(dateStr) {
 
 function daysUntil(dateStr) {
   if (!dateStr) return 0
-  const diff = new Date(dateStr) - new Date()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  return Math.floor((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24))
 }
 
 function getStatusVariant(status) {
-  const variants = {
-    active: 'success',
-    pending: 'warning',
-    expired: 'danger',
-    failed: 'danger',
-    revoked: 'secondary'
+  switch (status) {
+    case 'active': return 'success'
+    case 'pending': return 'warning'
+    case 'expired': return 'danger'
+    case 'failed': return 'danger'
+    case 'revoked': return 'secondary'
+    default: return 'secondary'
   }
-  return variants[status] || 'secondary'
 }
 
 function getExpiryClass(dateStr) {
   const days = daysUntil(dateStr)
-  if (days <= 7) return 'text-red-600'
-  if (days <= 30) return 'text-yellow-600'
-  return 'text-gray-900 dark:text-white'
+  if (days <= 7) return 'text-red-600 dark:text-red-400 font-semibold'
+  if (days <= 30) return 'text-orange-600 dark:text-orange-400'
+  return 'text-green-600 dark:text-green-400'
 }
 
-function toggleSelectAll() {
-  if (isAllSelected.value) {
-    selectedCertificates.value = []
-  } else {
-    selectedCertificates.value = filteredCertificates.value.map(c => c.id)
-  }
-}
-
-async function loadCertificates() {
+async function fetchCertificates() {
   loading.value = true
   try {
     const response = await api.get('/ssl')
-    certificates.value = response.data.data
-  } catch (error) {
-    appStore.showError('Failed to load certificates')
+    certificates.value = response.data.data || []
+  } catch (err) {
+    console.error('Failed to fetch certificates:', err)
   } finally {
     loading.value = false
   }
 }
 
-async function loadDomains() {
+async function fetchDomains() {
   try {
     const response = await api.get('/domains')
-    domains.value = response.data.data
-  } catch (error) {
-    appStore.showError('Failed to load domains')
+    domains.value = response.data.data || []
+  } catch (err) {
+    console.error('Failed to fetch domains:', err)
   }
 }
 
 async function issueCertificate() {
+  if (!issueForm.value.domain_id) return
   issuing.value = true
   try {
-    const selectedDomain = domains.value.find(d => d.id === issueForm.value.domain_id)
-    
     if (issueForm.value.type === 'lets_encrypt') {
-      await api.post(`/domains/${selectedDomain.id}/ssl/lets-encrypt`)
+      await api.post(`/ssl/domains/${issueForm.value.domain_id}/letsencrypt`)
     } else {
-      await api.post(`/domains/${selectedDomain.id}/ssl/custom`, {
+      await api.post(`/ssl/domains/${issueForm.value.domain_id}/custom`, {
         certificate: issueForm.value.certificate,
         private_key: issueForm.value.private_key,
-        ca_bundle: issueForm.value.ca_bundle || null
+        ca_bundle: issueForm.value.ca_bundle || undefined
       })
     }
-    
-    appStore.showSuccess('Certificate issued successfully')
+    appStore.showToast({ type: 'success', message: 'Certificate issued successfully!' })
     showIssueModal.value = false
-    resetIssueForm()
-    loadCertificates()
-  } catch (error) {
-    appStore.showError(error.response?.data?.error?.message || 'Failed to issue certificate')
+    issueForm.value = { domain_id: '', type: 'lets_encrypt', certificate: '', private_key: '', ca_bundle: '' }
+    await fetchCertificates()
+  } catch (err) {
+    appStore.showToast({ type: 'error', message: err.response?.data?.error?.message || 'Failed to issue certificate.' })
   } finally {
     issuing.value = false
   }
@@ -546,10 +493,10 @@ async function renewCert(cert) {
   renewingId.value = cert.id
   try {
     await api.post(`/ssl/${cert.id}/renew`)
-    appStore.showSuccess('Certificate renewed successfully')
-    loadCertificates()
-  } catch (error) {
-    appStore.showError(error.response?.data?.error?.message || 'Failed to renew certificate')
+    appStore.showToast({ type: 'success', message: 'Certificate renewed successfully!' })
+    await fetchCertificates()
+  } catch (err) {
+    appStore.showToast({ type: 'error', message: err.response?.data?.error?.message || 'Renewal failed.' })
   } finally {
     renewingId.value = null
   }
@@ -558,10 +505,9 @@ async function renewCert(cert) {
 async function toggleAutoRenew(cert) {
   try {
     await api.post(`/ssl/${cert.id}/toggle-auto-renew`)
-    appStore.showSuccess(cert.auto_renew ? 'Auto-renewal disabled' : 'Auto-renewal enabled')
-    loadCertificates()
-  } catch (error) {
-    appStore.showError(error.response?.data?.error?.message || 'Failed to toggle auto-renewal')
+    cert.auto_renew = !cert.auto_renew
+  } catch (err) {
+    appStore.showToast({ type: 'error', message: 'Failed to toggle auto-renew.' })
   }
 }
 
@@ -574,87 +520,49 @@ async function deleteCert() {
   deleting.value = true
   try {
     await api.delete(`/ssl/${certToDelete.value.id}`)
-    appStore.showSuccess('Certificate deleted successfully')
+    appStore.showToast({ type: 'success', message: 'Certificate deleted.' })
     showDeleteConfirm.value = false
-    certToDelete.value = null
-    loadCertificates()
-  } catch (error) {
-    appStore.showError(error.response?.data?.error?.message || 'Failed to delete certificate')
+    await fetchCertificates()
+  } catch (err) {
+    appStore.showToast({ type: 'error', message: err.response?.data?.error?.message || 'Delete failed.' })
   } finally {
     deleting.value = false
   }
 }
 
-async function bulkDeleteCertificates() {
-  if (selectedCertificates.value.length === 0) return
-  
-  const confirmed = confirm(`Are you sure you want to delete ${selectedCertificates.value.length} certificates? This action cannot be undone.`)
-  if (!confirmed) return
-  
-  bulkDeleting.value = true
-  try {
-    const response = await api.post('/api/v1/ssl/bulk-delete', {
-      ids: selectedCertificates.value
-    })
-    
-    const results = response.data.data
-    if (results.succeeded > 0) {
-      appStore.showSuccess(`${results.succeeded} certificates deleted successfully`)
-    }
-    if (results.failed > 0) {
-      appStore.showError(`${results.failed} certificates failed to delete`)
-    }
-    
-    selectedCertificates.value = []
-    loadCertificates()
-  } catch (error) {
-    appStore.showError(error.response?.data?.error?.message || 'Bulk delete failed')
-  } finally {
-    bulkDeleting.value = false
-  }
-}
-
-async function bulkReissueCertificates() {
-  if (selectedCertificates.value.length === 0 || !canBulkReissue.value) return
-  
-  const confirmed = confirm(`Are you sure you want to reissue ${selectedCertificates.value.length} Let's Encrypt certificates?`)
-  if (!confirmed) return
-  
-  bulkReissuing.value = true
-  try {
-    const response = await api.post('/api/v1/ssl/bulk-reissue', {
-      ids: selectedCertificates.value
-    })
-    
-    const results = response.data.data
-    if (results.succeeded > 0) {
-      appStore.showSuccess(`${results.succeeded} certificates reissued successfully`)
-    }
-    if (results.failed > 0) {
-      appStore.showError(`${results.failed} certificates failed to reissue`)
-    }
-    
-    selectedCertificates.value = []
-    loadCertificates()
-  } catch (error) {
-    appStore.showError(error.response?.data?.error?.message || 'Bulk reissue failed')
-  } finally {
-    bulkReissuing.value = false
-  }
-}
-
-function resetIssueForm() {
-  issueForm.value = {
-    domain_id: '',
-    type: 'lets_encrypt',
-    certificate: '',
-    private_key: '',
-    ca_bundle: ''
-  }
-}
-
-onMounted(() => {
-  loadCertificates()
-  loadDomains()
+onMounted(async () => {
+  await Promise.all([fetchCertificates(), fetchDomains()])
 })
+
+const toggleSelectAll = () => {
+  if (selectAll.value) {
+    selectedIds.value = filteredCertificates.value.map(c => c.id)
+  } else {
+    selectedIds.value = []
+  }
+}
+
+const bulkDelete = async () => {
+  if (!confirm(`Delete ${selectedIds.value.length} certificate(s)?`)) return
+  try {
+    await api.post('/ssl/bulk-delete', { ids: selectedIds.value })
+    selectedIds.value = []
+    selectAll.value = false
+    await fetchCertificates()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const bulkReissue = async () => {
+  if (!confirm(`Reissue ${selectedIds.value.length} certificate(s)?`)) return
+  try {
+    await api.post('/ssl/bulk-reissue', { ids: selectedIds.value })
+    selectedIds.value = []
+    selectAll.value = false
+    await fetchCertificates()
+  } catch (e) {
+    console.error(e)
+  }
+}
 </script>

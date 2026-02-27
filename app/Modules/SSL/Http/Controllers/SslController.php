@@ -283,171 +283,67 @@ class SslController extends Controller
 
         return new SslCertificateCollection($certificates);
     }
-}
 
     /**
      * Bulk delete certificates.
      */
-    public function bulkDelete(Request $request): JsonResponse
+    public function bulkDelete(Request $request): \Illuminate\Http\JsonResponse
     {
-        $request->validate([
-            "ids" => "required|array",
-            "ids.*" => "required|integer|exists:ssl_certificates,id",
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'required|string',
         ]);
 
-        $certificateIds = $request->ids;
+        $certs = SslCertificate::whereIn('id', $validated['ids'])->get();
+        $sslService = app(SslService::class);
+        $deleted = 0;
 
-        // Check authorization for each certificate
-        $certificates = SslCertificate::whereIn("id", $certificateIds)->get();
-        foreach ($certificates as $certificate) {
-            $this->authorize("delete", $certificate);
+        foreach ($certs as $cert) {
+            try {
+                if ($cert->status === 'active') {
+                    $sslService->revokeCertificate($cert);
+                }
+                $cert->delete();
+                $deleted++;
+            } catch (\Exception $e) {
+                // Continue with next
+            }
         }
 
-        try {
-            $results = $this->sslService->bulkDelete($certificateIds);
-
-            return response()->json([
-                "success" => true,
-                "message" => "Bulk delete completed. Processed: {$results["processed"]}, Succeeded: {$results["succeeded"]}, Failed: {$results["failed"]}",
-                "data" => $results,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                "success" => false,
-                "error" => [
-                    "code" => "BULK_DELETE_FAILED",
-                    "message" => $e->getMessage(),
-                ],
-            ], 422);
-        }
+        return response()->json(['message' => "{$deleted} certificate(s) deleted"]);
     }
 
     /**
      * Bulk reissue certificates.
      */
-    public function bulkReissue(Request $request): JsonResponse
+    public function bulkReissue(Request $request): \Illuminate\Http\JsonResponse
     {
-        $request->validate([
-            "ids" => "required|array",
-            "ids.*" => "required|integer|exists:ssl_certificates,id",
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'required|string',
         ]);
 
-        $certificateIds = $request->ids;
+        $certs = SslCertificate::with('domain')->whereIn('id', $validated['ids'])->get();
+        $sslService = app(SslService::class);
+        $reissued = 0;
+        $errors = [];
 
-        // Check authorization and type for each certificate
-        $certificates = SslCertificate::whereIn("id", $certificateIds)->get();
-        foreach ($certificates as $certificate) {
-            $this->authorize("update", $certificate);
-            if ($certificate->type !== "lets_encrypt") {
-                return response()->json([
-                    "success" => false,
-                    "error" => [
-                        "code" => "INVALID_CERTIFICATE_TYPE",
-                        "message" => "Only Let's Encrypt certificates can be reissued.",
-                    ],
-                ], 422);
+        foreach ($certs as $cert) {
+            try {
+                if ($cert->domain) {
+                    // Delete old cert first
+                    $cert->delete();
+                    $sslService->issueLetsEncrypt($cert->domain);
+                    $reissued++;
+                }
+            } catch (\Exception $e) {
+                $errors[] = ($cert->domain->name ?? 'unknown') . ': ' . $e->getMessage();
             }
         }
 
-        try {
-            $results = $this->sslService->bulkReissue($certificateIds);
-
-            return response()->json([
-                "success" => true,
-                "message" => "Bulk reissue completed. Processed: {$results["processed"]}, Succeeded: {$results["succeeded"]}, Failed: {$results["failed"]}",
-                "data" => $results,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                "success" => false,
-                "error" => [
-                    "code" => "BULK_REISSUE_FAILED",
-                    "message" => $e->getMessage(),
-                ],
-            ], 422);
-        }
-    }
-
-    /**
-     * Bulk delete certificates.
-     */
-    public function bulkDelete(Request $request): JsonResponse
-    {
-        $request->validate([
-            "ids" => "required|array",
-            "ids.*" => "required|integer|exists:ssl_certificates,id",
+        return response()->json([
+            'message' => "{$reissued} certificate(s) reissued",
+            'errors' => $errors,
         ]);
-
-        $certificateIds = $request->ids;
-
-        // Check authorization for each certificate
-        $certificates = SslCertificate::whereIn("id", $certificateIds)->get();
-        foreach ($certificates as $certificate) {
-            $this->authorize("delete", $certificate);
-        }
-
-        try {
-            $results = $this->sslService->bulkDelete($certificateIds);
-
-            return response()->json([
-                "success" => true,
-                "message" => "Bulk delete completed. Processed: {$results["processed"]}, Succeeded: {$results["succeeded"]}, Failed: {$results["failed"]}",
-                "data" => $results,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                "success" => false,
-                "error" => [
-                    "code" => "BULK_DELETE_FAILED",
-                    "message" => $e->getMessage(),
-                ],
-            ], 422);
-        }
-    }
-
-    /**
-     * Bulk reissue certificates.
-     */
-    public function bulkReissue(Request $request): JsonResponse
-    {
-        $request->validate([
-            "ids" => "required|array",
-            "ids.*" => "required|integer|exists:ssl_certificates,id",
-        ]);
-
-        $certificateIds = $request->ids;
-
-        // Check authorization and type for each certificate
-        $certificates = SslCertificate::whereIn("id", $certificateIds)->get();
-        foreach ($certificates as $certificate) {
-            $this->authorize("update", $certificate);
-            if ($certificate->type !== "lets_encrypt") {
-                return response()->json([
-                    "success" => false,
-                    "error" => [
-                        "code" => "INVALID_CERTIFICATE_TYPE",
-                        "message" => "Only Let's Encrypt certificates can be reissued.",
-                    ],
-                ], 422);
-            }
-        }
-
-        try {
-            $results = $this->sslService->bulkReissue($certificateIds);
-
-            return response()->json([
-                "success" => true,
-                "message" => "Bulk reissue completed. Processed: {$results["processed"]}, Succeeded: {$results["succeeded"]}, Failed: {$results["failed"]}",
-                "data" => $results,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                "success" => false,
-                "error" => [
-                    "code" => "BULK_REISSUE_FAILED",
-                    "message" => $e->getMessage(),
-                ],
-            ], 422);
-        }
     }
 }

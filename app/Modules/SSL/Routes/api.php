@@ -29,8 +29,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum'])->group(function () 
         Route::post('/{ssl}/toggle-auto-renew', [SslController::class, 'toggleAutoRenew'])
             ->name('ssl.toggle-auto-renew');
         Route::delete('/{ssl}', [SslController::class, 'destroy'])->name('ssl.destroy');
-        // Bulk operations
-        Route::post("/bulk-delete", [SslController::class, "bulkDelete"])->name("ssl.bulk-delete");
-        Route::post("/bulk-reissue", [SslController::class, "bulkReissue"])->name("ssl.bulk-reissue");
     });
+
+    Route::post('/ssl/bulk-delete', [SslController::class, 'bulkDelete']);
+    Route::post('/ssl/bulk-reissue', [SslController::class, 'bulkReissue']);
 });

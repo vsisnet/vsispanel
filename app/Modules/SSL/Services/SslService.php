@@ -32,11 +32,12 @@ class SslService
 
         if ($existingCert) {
             throw new RuntimeException("Domain already has an active SSL certificate.");
-n        // Delete any existing pending or failed certificates for this domain to prevent duplicates
-        SslCertificate::where("domain_id", $domain->id)
-            ->whereIn("status", ["pending", "failed"])
-            ->delete();
         }
+
+        // Clean up any pending/failed certificates (prevents duplicates on retry)
+        SslCertificate::where('domain_id', $domain->id)
+            ->whereIn('status', ['pending', 'failed'])
+            ->delete();
 
         // Create pending certificate record
         $certificate = SslCertificate::create([
@@ -603,95 +604,6 @@ n        // Delete any existing pending or failed certificates for this domain t
                     'id' => $certificate->id,
                     'domain' => $certificate->domain->name,
                     'error' => $e->getMessage(),
-                ];
-            }
-        }
-
-        return $results;
-    }
-n    /**
-     * Bulk delete certificates.
-     */
-    public function bulkDelete(array $certificateIds): array
-    {
-        $results = [
-            "processed" => count($certificateIds),
-            "succeeded" => 0,
-            "failed" => 0,
-            "deleted" => [],
-            "errors" => [],
-        ];
-
-        $certificates = SslCertificate::whereIn("id", $certificateIds)->get();
-
-        foreach ($certificates as $certificate) {
-            try {
-                // Only revoke if cert is active
-                if ($certificate->status === "active") {
-                    try {
-                        $this->revokeCertificate($certificate);
-                    } catch (Exception $e) {
-                        // Revoke failed, still delete the record
-                    }
-                }
-
-                $certificate->delete();
-                $results["succeeded"]++;
-                $results["deleted"][] = [
-                    "id" => $certificate->id,
-                    "domain" => $certificate->domain->name,
-                ];
-            } catch (Exception $e) {
-                $results["failed"]++;
-                $results["errors"][] = [
-                    "id" => $certificate->id,
-                    "domain" => $certificate->domain->name ?? "Unknown",
-                    "error" => $e->getMessage(),
-                ];
-            }
-        }
-
-        return $results;
-    }
-
-    /**
-     * Bulk reissue certificates.
-     */
-    public function bulkReissue(array $certificateIds): array
-    {
-        $results = [
-            "processed" => count($certificateIds),
-            "succeeded" => 0,
-            "failed" => 0,
-            "reissued" => [],
-            "errors" => [],
-        ];
-
-        $certificates = SslCertificate::with("domain")
-            ->whereIn("id", $certificateIds)
-            ->where("type", "lets_encrypt")
-            ->get();
-
-        foreach ($certificates as $certificate) {
-            try {
-                // Delete the old certificate first
-                $domain = $certificate->domain;
-                $certificate->delete();
-
-                // Issue new certificate
-                $newCertificate = $this->issueLetsEncrypt($domain);
-                
-                $results["succeeded"]++;
-                $results["reissued"][] = [
-                    "id" => $newCertificate->id,
-                    "domain" => $domain->name,
-                ];
-            } catch (Exception $e) {
-                $results["failed"]++;
-                $results["errors"][] = [
-                    "id" => $certificate->id,
-                    "domain" => $certificate->domain->name ?? "Unknown",
-                    "error" => $e->getMessage(),
                 ];
             }
         }
