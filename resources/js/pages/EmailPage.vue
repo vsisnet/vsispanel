@@ -616,6 +616,7 @@ import {
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // State
 const loading = ref(false)
