@@ -127,7 +127,7 @@
     </div>
 
     <!-- Disk Usage -->
-    <VCard :title="authStore.isAdmin ? ('dashboard.diskUsage') : ('dashboard.yourDiskUsage')" class="mb-6">
+    <VCard :title="authStore.isAdmin ? $t('dashboard.diskUsage') : $t('dashboard.yourDiskUsage')" class="mb-6">
       <template v-if="dashboardStore.loading.metrics">
         <VLoadingSkeleton class="h-24" />
       </template>
@@ -142,19 +142,19 @@
             <div class="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div :class="getDiskBarClass(disk.percentage)" :style="{ width: disk.percentage + '%' }" class="h-full rounded-full transition-all duration-300" />
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400 text-right">{{ disk.percentage }}% {{ ('dashboard.used') }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 text-right">{{ disk.percentage }}% {{ $t('dashboard.used') }}</p>
           </div>
         </div>
         <!-- User: disk quota only -->
         <div v-else class="space-y-2">
           <div class="flex justify-between text-sm">
-            <span class="text-gray-700 dark:text-gray-300">{{ ('dashboard.diskQuota') }}</span>
+            <span class="text-gray-700 dark:text-gray-300">{{ $t('dashboard.diskQuota') }}</span>
             <span class="text-gray-500 dark:text-gray-400">{{ dashboardStore.stats?.disk_used || '0 MB' }} / {{ dashboardStore.stats?.disk_quota || 'Unlimited' }}</span>
           </div>
           <div class="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div :class="getDiskBarClass(dashboardStore.stats?.disk_percentage || 0)" :style="{ width: (dashboardStore.stats?.disk_percentage || 0) + '%' }" class="h-full rounded-full transition-all duration-300" />
           </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 text-right">{{ dashboardStore.stats?.disk_percentage || 0 }}% {{ ('dashboard.used') }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 text-right">{{ dashboardStore.stats?.disk_percentage || 0 }}% {{ $t('dashboard.used') }}</p>
         </div>
       </template>
     </VCard>
