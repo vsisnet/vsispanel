@@ -97,7 +97,7 @@ class PleskMigrator extends BaseMigrator
                 // Use original database name from source (Plesk)
                 $originalDbName = $wpConfig['db_name'];
                 $originalDbUser = $wpConfig['db_user'] ?? $originalDbName;
-                $dbResult = $this->createDatabaseFromSource($originalDbName, $originalDbUser, $job);
+                $dbResult = $this->createDatabaseFromSource($originalDbName, $originalDbUser, $domain, $job);
 
                 if ($dbResult) {
                     $job->appendLog("  Database: {$dbResult['db_name']}");
@@ -241,7 +241,7 @@ class PleskMigrator extends BaseMigrator
      * Create database + user using original names from source server.
      * No prefix, no renaming — just replicate the source DB setup.
      */
-    private function createDatabaseFromSource(string $dbName, string $dbUser, ?MigrationJob $job = null): ?array
+    private function createDatabaseFromSource(string $dbName, string $dbUser, ?object $domain = null, ?MigrationJob $job = null): ?array
     {
         $dbPass = bin2hex(random_bytes(12));
 
@@ -275,6 +275,32 @@ class PleskMigrator extends BaseMigrator
         if (!$userProcess->isSuccessful()) {
             $job?->appendLog("  Failed to create user {$dbUser}: {$userProcess->getErrorOutput()}");
             // DB created but user failed — still return with root access
+        }
+
+        // Register in VsisPanel managed_databases so it shows in UI
+        try {
+            \App\Modules\Database\Models\ManagedDatabase::updateOrCreate(
+                ['name' => $dbName],
+                [
+                    'user_id' => $domain?->user_id,
+                    'domain_id' => $domain?->id,
+                    'original_name' => $dbName,
+                    'size_bytes' => 0,
+                    'charset' => 'utf8mb4',
+                    'collation' => 'utf8mb4_unicode_ci',
+                    'status' => 'active',
+                ]
+            );
+            \App\Modules\Database\Models\DatabaseUser::updateOrCreate(
+                ['username' => $dbUser],
+                [
+                    'user_id' => $domain?->user_id,
+                    'original_username' => $dbUser,
+                    'host' => 'localhost',
+                ]
+            );
+        } catch (\Exception $e) {
+            $job?->appendLog("  Warning: Could not register DB in panel: {$e->getMessage()}");
         }
 
         return [
