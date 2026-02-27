@@ -124,6 +124,9 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Domain
               </th>
+                <th v-if="authStore.isAdmin" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  User
+                </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Type
               </th>
@@ -156,6 +159,9 @@
                   <span class="font-medium text-gray-900 dark:text-white">{{ cert.domain?.name || '-' }}</span>
                 </div>
               </td>
+                <td v-if="authStore.isAdmin" class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {{ cert.domain?.user?.name || cert.domain?.user?.username || "-" }}
+                </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <VBadge :variant="cert.type === 'lets_encrypt' ? 'success' : 'primary'" size="sm">
                   {{ cert.type === 'lets_encrypt' ? "Let's Encrypt" : 'Custom' }}
@@ -360,6 +366,7 @@ import {
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // State
 const loading = ref(false)

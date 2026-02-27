@@ -26,7 +26,7 @@ class SslController extends Controller
      */
     public function index(Request $request): SslCertificateCollection
     {
-        $query = SslCertificate::with('domain');
+        $query = SslCertificate::with('domain.user');
 
         // Filter by user for non-admins
         if (!$request->user()->isAdmin()) {
@@ -268,7 +268,7 @@ class SslController extends Controller
 
         $days = (int) $request->get('days', 14);
 
-        $query = SslCertificate::with('domain')
+        $query = SslCertificate::with('domain.user')
             ->expiringSoon($days);
 
         // Filter by user for non-admins
@@ -322,7 +322,7 @@ class SslController extends Controller
             'ids.*' => 'required|string',
         ]);
 
-        $certs = SslCertificate::with('domain')->whereIn('id', $validated['ids'])->get();
+        $certs = SslCertificate::with('domain.user')->whereIn('id', $validated['ids'])->get();
         $sslService = app(SslService::class);
         $reissued = 0;
         $errors = [];

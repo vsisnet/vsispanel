@@ -140,6 +140,9 @@
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {{ $t('websites.domain') }}
                 </th>
+                <th v-if="authStore.isAdmin" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  User
+                </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {{ $t('websites.status') }}
                 </th>
@@ -190,6 +193,9 @@
                       </div>
                     </div>
                   </div>
+                </td>
+                <td v-if="authStore.isAdmin" class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {{ domain.user?.name || domain.user?.username || "-" }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <VBadge :variant="getStatusVariant(domain.status)">
@@ -512,6 +518,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDomainsStore } from '@/stores/domains'
@@ -551,6 +558,7 @@ import {
 const router = useRouter()
 const { t } = useI18n()
 const domainsStore = useDomainsStore()
+const authStore = useAuthStore()
 const appStore = useAppStore()
 
 // PHP versions

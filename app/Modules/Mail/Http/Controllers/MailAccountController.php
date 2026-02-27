@@ -30,7 +30,7 @@ class MailAccountController extends Controller
     {
         $user = $request->user();
 
-        $query = MailAccount::with(['mailDomain.domain', 'forwards'])
+        $query = MailAccount::with(['mailDomain.domain.user', 'forwards'])
             ->whereHas('mailDomain.domain', function ($q) use ($user) {
                 if ($user->isAdmin()) {
                     // Admin sees all

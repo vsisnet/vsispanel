@@ -228,6 +228,9 @@
                   <span class="font-medium text-gray-900 dark:text-white">{{ account.username }}</span>
                 </div>
               </td>
+                  <td v-if="authStore.isAdmin" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {{ account.user?.name || account.user?.username || '-' }}
+                  </td>
               <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                 {{ account.domain?.name || '-' }}
               </td>
@@ -586,6 +589,7 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '@/stores/auth'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

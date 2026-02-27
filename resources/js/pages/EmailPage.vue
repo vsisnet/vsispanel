@@ -130,7 +130,7 @@
               </thead>
               <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 <tr v-if="accounts.length === 0">
-                  <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     {{ $t('email.noAccounts') }}
                   </td>
                 </tr>
@@ -140,6 +140,9 @@
                       <EnvelopeIcon class="w-5 h-5 text-gray-400 mr-3" />
                       <span class="font-medium text-gray-900 dark:text-white">{{ account.email }}</span>
                     </div>
+                  </td>
+                  <td v-if="authStore.isAdmin" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {{ account.mailDomain?.domain?.user?.name || account.mailDomain?.domain?.user?.username || '-' }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="w-32">
@@ -582,6 +585,7 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '@/stores/auth'
 import { ref, computed, onMounted, watch, markRaw } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

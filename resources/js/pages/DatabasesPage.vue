@@ -118,6 +118,9 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 {{ $t('databases.name') }}
               </th>
+                <th v-if="authStore.isAdmin" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  User
+                </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 {{ $t('databases.users') }}
               </th>
@@ -159,6 +162,9 @@
                   </div>
                 </div>
               </td>
+                <td v-if="authStore.isAdmin" class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {{ db.user?.name || db.user?.username || "-" }}
+                </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex flex-wrap gap-1">
                   <VBadge
@@ -717,6 +723,7 @@ import {
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // State
 const databases = ref([])
