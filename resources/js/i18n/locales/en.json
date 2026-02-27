@@ -143,7 +143,9 @@
     "ftpAccounts": "FTP Accounts",
     "fileManager": "File Manager",
     "sslCertificate": "SSL Certificate",
-    "migration": "Migration"
+    "migration": "Migration",
+    "yourDiskUsage": "Your Disk Usage",
+    "diskQuota": "Disk Quota"
   },
   "profile": {
     "title": "Profile",

@@ -143,7 +143,9 @@
     "ftpAccounts": "Tài khoản FTP",
     "fileManager": "Quản lý tệp",
     "sslCertificate": "Chứng chỉ SSL",
-    "migration": "Di chuyển"
+    "migration": "Di chuyển",
+    "yourDiskUsage": "Dung lượng đĩa",
+    "diskQuota": "Quota đĩa"
   },
   "profile": {
     "title": "Hồ sơ cá nhân",
