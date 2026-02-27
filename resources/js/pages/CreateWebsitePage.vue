@@ -40,6 +40,7 @@
 
         <!-- Step Content -->
         <div class="min-h-[200px]">
+        <UserSelect v-model="form.user_id" />
           <!-- Step 1: Domain Name -->
           <div v-if="currentStep === 0" class="space-y-4">
             <div>
@@ -176,6 +177,7 @@
 </template>
 
 <script setup>
+import UserSelect from '@/components/UserSelect.vue'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -200,6 +202,7 @@ const errors = ref({})
 const phpVersions = ['7.4', '8.0', '8.1', '8.2', '8.3']
 
 const form = ref({
+  user_id: '',
   name: '',
   php_version: '8.3',
   auto_ssl: true,

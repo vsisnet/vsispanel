@@ -109,8 +109,14 @@ class DomainController extends ApiController
     {
         $this->authorize('create', Domain::class);
 
+        // Admin can assign domain to another user
+        $owner = $this->user();
+        if ($this->isAdmin() && $request->filled('user_id')) {
+            $owner = \App\Modules\Auth\Models\User::findOrFail($request->input('user_id'));
+        }
+
         $domain = $this->domainService->create(
-            $this->user(),
+            $owner,
             $request->validated()
         );
 

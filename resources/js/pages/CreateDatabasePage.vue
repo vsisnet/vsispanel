@@ -7,6 +7,7 @@
         <form @submit.prevent="createDatabase">
           <div class="space-y-4">
             <div>
+        <UserSelect v-model="form.user_id" />
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ $t('databases.name') }}
               </label>
@@ -83,6 +84,7 @@
 </template>
 
 <script setup>
+import UserSelect from '@/components/UserSelect.vue'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -102,6 +104,7 @@ const creating = ref(false)
 const showPassword = ref(false)
 
 const form = ref({
+  user_id: '',
   name: '',
   charset: 'utf8mb4',
   collation: 'utf8mb4_unicode_ci',

@@ -16,6 +16,7 @@
         <form v-else @submit.prevent="createAccount">
           <div class="space-y-4">
             <div>
+        <UserSelect v-model="form.user_id" />
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ $t('email.domain') }}
               </label>
@@ -79,6 +80,7 @@
 </template>
 
 <script setup>
+import UserSelect from '@/components/UserSelect.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -105,6 +107,7 @@ const selectedDomain = computed(() => domains.value.find(d => d.id === selectedD
 const mailDomainReady = computed(() => !!selectedMailDomain.value)
 
 const form = ref({ username: '', password: '', quota_mb: 1024 })
+  user_id: '',
 
 function generatePassword() {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'

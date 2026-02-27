@@ -10,6 +10,7 @@
         <form v-else @submit.prevent="saveAccount">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
+        <UserSelect v-model="form.user_id" />
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $t('ftp.domain') }} *</label>
               <select v-model="formData.domain_id" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500" required>
                 <option value="">{{ $t('ftp.selectDomain') }}</option>
@@ -100,6 +101,7 @@
 </template>
 
 <script setup>
+import UserSelect from '@/components/UserSelect.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
