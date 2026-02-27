@@ -55,13 +55,8 @@ class PleskMigrator extends BaseMigrator
         $items = $job->items ?? [];
         $discovered = $job->discovered_data ?? [];
         $selectedDomains = $items['domains'] ?? [];
-        $selectedDatabases = $items['databases'] ?? [];
         $migrateFiles = $items['files'] ?? true;
         $migrateSsl = $items['ssl'] ?? true;
-        $migrateCrons = $items['crons'] ?? false;
-
-        $totalSteps = count($selectedDomains) * 3 + count($selectedDatabases);
-        $currentStep = 0;
 
         foreach ($selectedDomains as $domainInfo) {
             $domainName = is_array($domainInfo) ? ($domainInfo['name'] ?? '') : $domainInfo;
@@ -69,121 +64,131 @@ class PleskMigrator extends BaseMigrator
 
             $job->appendLog("=== Migrating domain: {$domainName} ===");
 
-            // 1. Create domain in VsisPanel
+            // ─── STEP 1: Add domain on VsisPanel (like Add Website) ───
+            $job->appendLog("[Step 1] Creating domain on VsisPanel...");
             $domain = $this->createDomain($domainName, $job->user_id, $job);
             if (!$domain) {
-                $job->appendLog("SKIP: Could not create domain {$domainName}");
-                $currentStep += 3;
-                $job->updateProgress($this->calcProgress($currentStep, $totalSteps));
+                $job->appendLog("CRITICAL: Could not create/find domain {$domainName}, skipping");
                 continue;
             }
-            $currentStep++;
-            $job->updateProgress($this->calcProgress($currentStep, $totalSteps));
 
-            // 2. Rsync files
+            // Load user relationship
+            $domain->loadMissing('user');
+            $username = $domain->user->username ?? 'administrator';
+            $localPath = "/home/{$username}/domains/{$domainName}/public_html/";
+
+            // Ensure local path exists
+            if (!is_dir($localPath)) {
+                mkdir($localPath, 0755, true);
+            }
+
+            $job->updateProgress(10);
+
+            // ─── STEP 2: Get WP config from source (DB info) ───
+            $wpConfig = is_array($domainInfo) ? ($domainInfo['wp_config'] ?? null) : null;
+            $dbResult = null;
+
+            if ($wpConfig && !empty($wpConfig['db_name'])) {
+                $job->appendLog("[Step 2] WordPress detected. Source DB: {$wpConfig['db_name']}, User: {$wpConfig['db_user']}");
+
+                // ─── STEP 3: Create database + user on VsisPanel ───
+                $job->appendLog("[Step 3] Creating database and user...");
+
+                // Use clean name based on domain
+                $cleanName = str_replace(['.', '-'], '_', $domainName);
+                $cleanName = substr($cleanName, 0, 40);
+                $dbResult = $this->createLocalDatabaseWithName($domain, $cleanName, $job);
+
+                if ($dbResult) {
+                    $job->appendLog("  Database: {$dbResult['db_name']}");
+                    $job->appendLog("  User: {$dbResult['db_user']}");
+                    $job->appendLog("  Host: {$dbResult['db_host']}");
+                } else {
+                    $job->appendLog("WARNING: Failed to create database, will try direct method");
+                }
+            } else {
+                $job->appendLog("[Step 2] No WordPress config found, skipping database");
+            }
+
+            $job->updateProgress(30);
+
+            // ─── STEP 4: Migrate code (rsync files from source) ───
             if ($migrateFiles) {
                 $remotePath = $this->resolvePleskPath($domainInfo, $credentials);
-                $localPath = "/home/{$domain->user->username}/domains/{$domainName}/public_html/";
+                $job->appendLog("[Step 4] Syncing files: {$remotePath} -> {$localPath}");
 
-                if ($remotePath) {
-                    $job->appendLog("Syncing files: {$remotePath} -> {$localPath}");
-                    $success = $this->rsyncFrom($credentials, $remotePath, $localPath, $job);
-                    $job->appendLog($success ? 'Files synced OK' : 'File sync FAILED (continuing)');
+                $success = $this->rsyncFrom($credentials, $remotePath, $localPath, $job);
+                if ($success) {
+                    $job->appendLog("  Files synced successfully");
 
                     // Fix ownership
-                    $username = $domain->user->username ?? 'www-data';
-                    $process = new \Symfony\Component\Process\Process(['chown', '-R', "{$username}:{$username}", $localPath]);
-                    $process->setTimeout(120);
-                    $process->run();
+                    $chown = new \Symfony\Component\Process\Process(['chown', '-R', "{$username}:{$username}", $localPath]);
+                    $chown->setTimeout(120);
+                    $chown->run();
+                    $job->appendLog("  Ownership set to {$username}");
+                } else {
+                    $job->appendLog("  WARNING: File sync failed");
                 }
             }
-            $currentStep++;
-            $job->updateProgress($this->calcProgress($currentStep, $totalSteps));
 
-            // 3. WordPress database migration
-            $wpConfig = is_array($domainInfo) ? ($domainInfo['wp_config'] ?? null) : null;
-            if ($wpConfig && !empty($wpConfig['db_name'])) {
-                $job->appendLog("WordPress detected - migrating database: {$wpConfig['db_name']}");
+            $job->updateProgress(60);
+
+            // ─── STEP 5: Import SQL database ───
+            if ($dbResult && $wpConfig && !empty($wpConfig['db_name'])) {
+                $job->appendLog("[Step 5] Dumping database from source...");
 
                 $dumpFile = "/tmp/migration_{$job->id}_{$wpConfig['db_name']}.sql";
 
-                // Try Plesk admin credentials first
+                // Dump from Plesk source using admin credentials
                 $dumpCmd = 'MYSQL_PWD=$(cat /etc/psa/.psa.shadow) mysqldump -u admin --single-transaction --routines --triggers '
                     . escapeshellarg($wpConfig['db_name']) . ' 2>/dev/null';
                 $result = $this->sshExec($credentials, $dumpCmd, 600);
 
-                // Fallback to root mysql
                 if (!$result['success'] || strlen($result['stdout']) < 100) {
-                    $dumpCmd = 'mysqldump --single-transaction --routines --triggers '
+                    // Fallback: try with WP credentials
+                    $dumpCmd = 'MYSQL_PWD=' . escapeshellarg($wpConfig['db_pass'] ?? '') 
+                        . ' mysqldump -u ' . escapeshellarg($wpConfig['db_user'] ?? 'root')
+                        . ' --single-transaction --routines --triggers '
                         . escapeshellarg($wpConfig['db_name']) . ' 2>/dev/null';
                     $result = $this->sshExec($credentials, $dumpCmd, 600);
                 }
 
                 if ($result['success'] && strlen($result['stdout']) > 100) {
+                    $sqlSize = strlen($result['stdout']);
+                    $job->appendLog("  SQL dump size: " . number_format($sqlSize / 1024, 1) . " KB");
                     file_put_contents($dumpFile, $result['stdout']);
 
-                    $dbResult = $this->createLocalDatabase($domain, $wpConfig['db_name'], $job);
-                    if ($dbResult) {
-                        $this->importDatabase($dbResult['db_name'], $dumpFile, $job);
-
-                        $localWpPath = "/home/{$domain->user->username}/domains/{$domainName}/public_html/";
-                        $this->updateWpConfig($localWpPath, $dbResult, $job);
+                    $imported = $this->importDatabase($dbResult['db_name'], $dumpFile, $job);
+                    if ($imported) {
+                        $job->appendLog("  Database imported successfully");
+                    } else {
+                        $job->appendLog("  WARNING: Database import failed");
                     }
                     @unlink($dumpFile);
                 } else {
-                    $job->appendLog("DB dump failed for {$wpConfig['db_name']}");
+                    $job->appendLog("  WARNING: Could not dump source database");
                 }
-            }
-            $currentStep++;
-            $job->updateProgress($this->calcProgress($currentStep, $totalSteps));
 
-            // 4. SSL certificate
+                // ─── STEP 6: Update wp-config.php with new credentials ───
+                $job->appendLog("[Step 6] Updating wp-config.php...");
+                $this->updateWpConfig($localPath, $dbResult, $job);
+            }
+
+            $job->updateProgress(80);
+
+            // ─── STEP 7: SSL certificate ───
             if ($migrateSsl) {
+                $job->appendLog("[Step 7] Requesting SSL certificate...");
                 try {
                     $sslService = app(\App\Modules\SSL\Services\SslService::class);
                     $sslService->issueLetsEncrypt($domain);
-                    $job->appendLog("SSL issued for {$domainName}");
+                    $job->appendLog("  SSL issued for {$domainName}");
                 } catch (\Exception $e) {
-                    $job->appendLog("SSL failed for {$domainName}: {$e->getMessage()}");
+                    $job->appendLog("  SSL failed: {$e->getMessage()}");
                 }
             }
-        }
 
-        // Migrate standalone databases
-        foreach ($selectedDatabases as $dbInfo) {
-            $dbName = is_array($dbInfo) ? ($dbInfo['name'] ?? '') : $dbInfo;
-            if (!$dbName) continue;
-
-            $job->appendLog("=== Migrating standalone database: {$dbName} ===");
-
-            $dumpFile = "/tmp/migration_{$job->id}_{$dbName}.sql";
-            $dumpCmd = 'MYSQL_PWD=$(cat /etc/psa/.psa.shadow) mysqldump -u admin --single-transaction --routines --triggers '
-                . escapeshellarg($dbName) . ' 2>/dev/null';
-            $result = $this->sshExec($credentials, $dumpCmd, 600);
-
-            if ($result['success'] && strlen($result['stdout']) > 100) {
-                file_put_contents($dumpFile, $result['stdout']);
-                $this->importDatabase($dbName, $dumpFile, $job);
-                @unlink($dumpFile);
-            } else {
-                $job->appendLog("Failed to dump database {$dbName}");
-            }
-
-            $currentStep++;
-            $job->updateProgress($this->calcProgress($currentStep, $totalSteps));
-        }
-
-        // Cron jobs
-        if ($migrateCrons && !empty($discovered['crons'])) {
-            $job->appendLog("=== Migrating cron jobs ===");
-            foreach ($discovered['crons'] as $cron) {
-                $job->appendLog("Cron: {$cron}");
-                $process = new \Symfony\Component\Process\Process([
-                    'bash', '-c',
-                    "(crontab -l 2>/dev/null; echo " . escapeshellarg($cron) . ") | sort -u | crontab -"
-                ]);
-                $process->run();
-            }
+            $job->appendLog("=== Domain {$domainName} migration complete ===");
         }
 
         $job->updateProgress(100, 'Migration completed');
@@ -226,7 +231,43 @@ class PleskMigrator extends BaseMigrator
     /**
      * Create a local database + user for the migrated site.
      */
-    private function createLocalDatabase(object $domain, string $originalDbName, ?MigrationJob $job = null): ?array
+    /**
+     * Create database with a meaningful name based on domain.
+     */
+    private function createLocalDatabaseWithName(object $domain, string $cleanName, ?MigrationJob $job = null): ?array
+    {
+        try {
+            $dbService = app(\App\Modules\Database\Services\DatabaseService::class);
+            $domain->loadMissing('user');
+            $user = $domain->user;
+
+            if (!$user) {
+                $job?->appendLog("WARNING: Domain has no user, using direct DB creation");
+                return $this->createDatabaseDirect($cleanName, $job);
+            }
+
+            $dbName = $cleanName;
+            $dbUserName = $cleanName;
+            $dbPass = bin2hex(random_bytes(12));
+
+            $database = $dbService->createDatabase($user, $dbName, $domain);
+            $dbUser = $dbService->createDatabaseUser($user, $dbUserName, $dbPass);
+            $dbService->grantAccess($dbUser, $database);
+
+            return [
+                'db_name' => $database->name,
+                'db_user' => $dbUser->username,
+                'db_pass' => $dbPass,
+                'db_host' => 'localhost',
+            ];
+        } catch (\Exception $e) {
+            $job?->appendLog("DatabaseService error: {$e->getMessage()}");
+            // Fallback to direct MySQL creation
+            return $this->createDatabaseDirect($cleanName, $job);
+        }
+    }
+
+        private function createLocalDatabase(object $domain, string $originalDbName, ?MigrationJob $job = null): ?array
     {
         try {
             $dbService = app(\App\Modules\Database\Services\DatabaseService::class);
