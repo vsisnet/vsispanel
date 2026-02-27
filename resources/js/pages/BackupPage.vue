@@ -146,7 +146,7 @@
             {{ $t('backup.backups') }}
           </button>
           <button
-            @click="activeTab = 'configs'"
+            @click="activeTab = 'configs'" v-if="authStore.isAdmin"
             :class="[
               activeTab === 'configs'
                 ? 'border-primary-500 text-primary-600 dark:text-primary-400'
@@ -157,7 +157,7 @@
             {{ $t('backup.configs') }}
           </button>
           <button
-            @click="activeTab = 'remotes'"
+            @click="activeTab = 'remotes'" v-if="authStore.isAdmin"
             :class="[
               activeTab === 'remotes'
                 ? 'border-primary-500 text-primary-600 dark:text-primary-400'
@@ -401,7 +401,7 @@
     </div>
 
     <!-- Configurations Tab -->
-    <div v-if="activeTab === 'configs'">
+    <div v-if="activeTab === 'configs' && authStore.isAdmin">
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ $t('backup.configs') }}</h3>
@@ -502,7 +502,7 @@
     </div>
 
     <!-- Storage Remotes Tab -->
-    <div v-if="activeTab === 'remotes'">
+    <div v-if="activeTab === 'remotes' && authStore.isAdmin">
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <div>
@@ -1237,6 +1237,7 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '@/stores/auth'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -1244,6 +1245,7 @@ import api from '@/utils/api'
 import { useAppStore } from '@/stores/app'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
