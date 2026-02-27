@@ -89,7 +89,12 @@ abstract class BaseMigrator implements MigratorInterface
         $host = $credentials['host'];
         $port = $credentials['port'] ?? 22;
 
-        $cmd = ['rsync', '-avz', '--progress', '--delete'];
+        // Ensure local directory exists
+        if (!is_dir($localPath)) {
+            mkdir($localPath, 0755, true);
+        }
+
+        $cmd = ['rsync', '-avz', '--progress'];
 
         $sshCmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p {$port}";
 
@@ -118,6 +123,9 @@ abstract class BaseMigrator implements MigratorInterface
                 }
             });
 
+            if (!$process->isSuccessful()) {
+                $job?->appendLog("rsync stderr: " . substr($process->getErrorOutput(), 0, 500));
+            }
             return $process->isSuccessful();
         } catch (\Exception $e) {
             $job?->appendLog("rsync error: {$e->getMessage()}");
@@ -145,7 +153,7 @@ abstract class BaseMigrator implements MigratorInterface
         }
 
         // Import SQL file
-        $process = Process::fromShellCommandline("mysql `{$dbName}` < " . escapeshellarg($sqlFile));
+        $process = Process::fromShellCommandline("mysql " . escapeshellarg($dbName) . " < " . escapeshellarg($sqlFile));
         $process->setTimeout(3600);
         $process->run();
 
