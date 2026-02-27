@@ -134,6 +134,8 @@
                 <label v-for="(domain, i) in discoveredData.domains" :key="i" class="flex items-center p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700">
                   <input type="checkbox" v-model="selectedItems.domains" :value="domain" class="mr-3 rounded" />
                   <span class="text-sm text-gray-900 dark:text-white">{{ domain.name }}</span>
+                  <span v-if="domain.has_wordpress" class="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded">WP</span>
+                  <span v-if="domain.size" class="ml-1 text-xs text-gray-400">{{ domain.size }}</span>
                   <span class="ml-2 text-xs text-gray-500">{{ domain.path }}</span>
                 </label>
               </div>
@@ -204,11 +206,11 @@
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">{{ $t('migration.migrateFiles') }}:</span>
-              <span class="text-gray-900 dark:text-white font-medium">{{ selectedItems.files ? '✓' : '✗' }}</span>
+              <span class="text-gray-900 dark:text-white font-medium">{{ selectedItems.files ? 'Yes' : 'No' }}</span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">{{ $t('migration.issueSsl') }}:</span>
-              <span class="text-gray-900 dark:text-white font-medium">{{ selectedItems.ssl ? '✓' : '✗' }}</span>
+              <span class="text-gray-900 dark:text-white font-medium">{{ selectedItems.ssl ? 'Yes' : 'No' }}</span>
             </div>
           </div>
 
@@ -219,7 +221,7 @@
                 <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 {{ $t('migration.starting') }}
               </span>
-              <span v-else>🚀 {{ $t('migration.startMigration') }}</span>
+              <span v-else>{{ $t('migration.startMigration') }}</span>
             </button>
           </div>
         </div>
@@ -352,11 +354,11 @@ const selectedItems = reactive({
 })
 
 const sourceTypes = [
-  { value: 'plesk', label: 'Plesk', icon: '🟦' },
-  { value: 'cpanel', label: 'cPanel', icon: '🟧' },
-  { value: 'aapanel', label: 'aaPanel', icon: '🟩' },
-  { value: 'directadmin', label: 'DirectAdmin', icon: '🟪' },
-  { value: 'ssh', label: 'SSH', icon: '⬛' },
+  { value: 'plesk', label: 'Plesk', icon: 'P' },
+  { value: 'cpanel', label: 'cPanel', icon: 'cP' },
+  { value: 'aapanel', label: 'aaPanel', icon: 'aP' },
+  { value: 'directadmin', label: 'DirectAdmin', icon: 'DA' },
+  { value: 'ssh', label: 'SSH', icon: 'SSH' },
 ]
 
 const steps = [
