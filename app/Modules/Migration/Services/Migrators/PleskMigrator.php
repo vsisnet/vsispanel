@@ -253,11 +253,11 @@ class PleskMigrator extends BaseMigrator
             // Clean up soft-deleted managed_databases and managed_database_users with same name
             \App\Modules\Database\Models\ManagedDatabase::withTrashed()
                 ->where('user_id', $user->id)
-                ->where('original_name', $cleanName)
+                ->where('original_username', $cleanName)
                 ->forceDelete();
-            \App\Modules\Database\Models\ManagedDatabaseUser::withTrashed()
+            \App\Modules\Database\Models\DatabaseUser::withTrashed()
                 ->where('user_id', $user->id)
-                ->where('original_name', $cleanName)
+                ->where('original_username', $cleanName)
                 ->forceDelete();
 
             $database = $dbService->createDatabase($user, $dbName, $domain);
