@@ -142,13 +142,27 @@ abstract class BaseMigrator implements MigratorInterface
      */
     protected function importDatabase(string $dbName, string $sqlFile, ?MigrationJob $job = null): bool
     {
-        // Create database if not exists
-        $process = new Process(['mysql', '-e', "CREATE DATABASE IF NOT EXISTS `{$dbName}`"]);
-        $process->setTimeout(30);
-        $process->run();
+        // Ensure database exists using both Laravel DB and CLI
+        try {
+            \Illuminate\Support\Facades\DB::unprepared("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $job?->appendLog("  Database {$dbName} ensured via DB::unprepared");
+        } catch (\Exception $e) {
+            $job?->appendLog("  DB::unprepared CREATE failed: {$e->getMessage()}, trying CLI...");
+            $process = new Process(['mysql', '-e', "CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"]);
+            $process->setTimeout(30);
+            $process->run();
+            if (!$process->isSuccessful()) {
+                $job?->appendLog("  CLI CREATE also failed: {$process->getErrorOutput()}");
+                return false;
+            }
+        }
 
-        if (!$process->isSuccessful()) {
-            $job?->appendLog("Failed to create database {$dbName}: {$process->getErrorOutput()}");
+        // Verify database actually exists before import
+        $check = new Process(['mysql', '-N', '-e', "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = " . escapeshellarg($dbName)]);
+        $check->setTimeout(10);
+        $check->run();
+        if (trim($check->getOutput()) !== $dbName) {
+            $job?->appendLog("  CRITICAL: Database {$dbName} still does not exist after creation!");
             return false;
         }
 
