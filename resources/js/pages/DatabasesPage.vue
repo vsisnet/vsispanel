@@ -163,7 +163,7 @@
                 </div>
               </td>
                 <td v-if="authStore.isAdmin" class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                  {{ db.user?.name || db.user?.username || "-" }}
+                  {{ database.user?.name || database.user?.username || "-" }}
                 </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex flex-wrap gap-1">
