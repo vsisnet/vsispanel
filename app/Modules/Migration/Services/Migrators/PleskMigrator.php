@@ -249,8 +249,11 @@ class PleskMigrator extends BaseMigrator
                 return $this->createDatabaseDirect($cleanName, $job);
             }
 
-            $dbName = $cleanName;
-            $dbUserName = $cleanName;
+            // MySQL username max 32 chars. Prefix "administrator_" = 14 chars, so name max 18
+            $prefix = $user->username ?? 'administrator';
+            $maxLen = 32 - strlen($prefix) - 1; // -1 for underscore
+            $dbName = substr($cleanName, 0, $maxLen);
+            $dbUserName = substr($cleanName, 0, $maxLen);
             $dbPass = bin2hex(random_bytes(12));
 
             // Clean up soft-deleted records
@@ -272,9 +275,8 @@ class PleskMigrator extends BaseMigrator
                 ->forceDelete();
 
             // Drop existing MySQL database and user (from previous failed migrations)
-            $prefix = $user->username ?? 'administrator';
-            $fullDbName = "{$prefix}_{$cleanName}";
-            $fullUserName = "{$prefix}_{$cleanName}";
+            $fullDbName = "{$prefix}_{$dbName}";
+            $fullUserName = "{$prefix}_{$dbUserName}";
             $dropProcess = new \Symfony\Component\Process\Process(['mysql', '-e',
                 "DROP DATABASE IF EXISTS `{$fullDbName}`; DROP USER IF EXISTS '{$fullUserName}'@'localhost'; FLUSH PRIVILEGES;"
             ]);
