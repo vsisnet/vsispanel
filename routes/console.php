@@ -20,14 +20,14 @@ Artisan::command('inspire', function () {
 
 // Run scheduled backups every minute (the command checks next_run_at internally)
 Schedule::command('backup:run-scheduled')
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduled-backups.log'));
 
 // Collect server metrics every minute
 Schedule::job(new \App\Modules\Monitoring\Jobs\CollectMetricsJob())
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping();
 
 // Cleanup old metrics daily
