@@ -66,7 +66,7 @@ class MetricsCollector
         // Try to get more accurate CPU usage from /proc/stat
         if (file_exists('/proc/stat')) {
             $stat1 = $this->parseProcStat();
-            usleep(250000); // 250ms
+            usleep(1000000); // 1 second sample for accurate reading
             $stat2 = $this->parseProcStat();
 
             $idle1 = $stat1['idle'] + $stat1['iowait'];
