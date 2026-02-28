@@ -61,29 +61,38 @@ class MetricsCollector
     {
         $cores = (int) trim(shell_exec("nproc") ?? '1');
         $loadAvg = sys_getloadavg();
+
+        // Use cached /proc/stat: compare current reading with previous saved snapshot
+        // Avoids self-measurement bias from usleep() blocking inside PHP process
+        $cacheFile = storage_path('app/cpu_stat_cache.json');
         $percentage = min(100, round(($loadAvg[0] / max(1, $cores)) * 100, 1));
 
-        // Try to get more accurate CPU usage from /proc/stat
         if (file_exists('/proc/stat')) {
-            $stat1 = $this->parseProcStat();
-            usleep(1000000); // 1 second sample for accurate reading
             $stat2 = $this->parseProcStat();
+            $now = microtime(true);
 
-            $idle1 = $stat1['idle'] + $stat1['iowait'];
-            $idle2 = $stat2['idle'] + $stat2['iowait'];
-            $total1 = array_sum($stat1);
-            $total2 = array_sum($stat2);
-
-            $totalDiff = $total2 - $total1;
-            $idleDiff = $idle2 - $idle1;
-
-            if ($totalDiff > 0) {
-                $percentage = round((1 - ($idleDiff / $totalDiff)) * 100, 1);
+            if (file_exists($cacheFile)) {
+                $cached = json_decode(file_get_contents($cacheFile), true);
+                if ($cached && isset($cached['stat']) && ($now - ($cached['time'] ?? 0)) < 600) {
+                    $stat1 = $cached['stat'];
+                    $idle1 = $stat1['idle'] + $stat1['iowait'];
+                    $idle2 = $stat2['idle'] + $stat2['iowait'];
+                    $total1 = array_sum($stat1);
+                    $total2 = array_sum($stat2);
+                    $totalDiff = $total2 - $total1;
+                    $idleDiff = $idle2 - $idle1;
+                    if ($totalDiff > 0) {
+                        $percentage = round((1 - ($idleDiff / $totalDiff)) * 100, 1);
+                    }
+                }
             }
+
+            // Save current stat for next measurement
+            file_put_contents($cacheFile, json_encode(['stat' => $stat2, 'time' => $now]));
         }
 
         return [
-            'percentage' => max(0, $percentage),
+            'percentage' => max(0, min(100, $percentage)),
             'cores' => $cores,
             'load_1m' => round($loadAvg[0], 2),
             'load_5m' => round($loadAvg[1], 2),
