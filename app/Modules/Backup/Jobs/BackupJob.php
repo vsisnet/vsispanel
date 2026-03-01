@@ -21,8 +21,8 @@ class BackupJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
-    public int $timeout = 3600; // 1 hour
+    public int $tries = 2;
+    public int $timeout = 14400; // 4 hours
     public int $backoff = 60; // 1 minute
 
     protected ?Task $task = null;
