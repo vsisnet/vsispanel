@@ -449,4 +449,18 @@ class BackupJob implements ShouldQueue
             }
         }
     }
+
+    /**
+     * Format bytes to human readable string
+     */
+    protected function formatBytesHuman(int|float $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+        return round($bytes, 2) . ' ' . $units[$i];
+    }
 }
