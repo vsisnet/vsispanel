@@ -214,12 +214,12 @@ return [
             'connection' => 'redis',
             'queue' => ['backups'],
             'balance' => 'simple',
-            'maxProcesses' => 2,
+            'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 256,
-            'tries' => 3,
-            'timeout' => 3600, // 1 hour for long backups
+            'tries' => 1,
+            'timeout' => 10800, // 3 hours for large backups
             'nice' => 0,
         ],
         'supervisor-installs' => [
@@ -246,7 +246,7 @@ return [
             ],
             'supervisor-backups' => [
                 'minProcesses' => 1,
-                'maxProcesses' => 2,
+                'maxProcesses' => 1,
             ],
             'supervisor-installs' => [
                 'minProcesses' => 1,
@@ -256,7 +256,7 @@ return [
 
         'local' => [
             'supervisor-1' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 1,
             ],
             'supervisor-backups' => [
                 'maxProcesses' => 1,
