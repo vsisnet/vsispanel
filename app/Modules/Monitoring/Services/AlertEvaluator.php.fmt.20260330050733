@@ -208,7 +208,7 @@ class AlertEvaluator
 
         $severity = strtoupper($rule->severity ?? 'WARNING');
 
-        Mail::raw($this->prependServerIp($message), function ($mail) use ($to, $rule, $severity) {
+        Mail::raw($message, function ($mail) use ($to, $rule, $severity) {
             $server = $this->getServerIdentifier();
             $mail->to($to)->subject("[VSISPanel {$severity}] [{$server}] {$rule->name}");
         });
@@ -267,7 +267,7 @@ class AlertEvaluator
             'category' => $rule->category ?? 'resource',
             'rule' => $rule->name,
             'metric' => $rule->metric,
-            'message' => $this->prependServerIp($message),
+            'message' => $message,
             'server' => $this->getServerIdentifier(),
             'timestamp' => now()->toIso8601String(),
         ];

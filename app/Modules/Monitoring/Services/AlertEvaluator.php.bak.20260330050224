@@ -208,7 +208,7 @@ class AlertEvaluator
 
         $severity = strtoupper($rule->severity ?? 'WARNING');
 
-        Mail::raw($this->prependServerIp($message), function ($mail) use ($to, $rule, $severity) {
+        Mail::raw($message, function ($mail) use ($to, $rule, $severity) {
             $server = $this->getServerIdentifier();
             $mail->to($to)->subject("[VSISPanel {$severity}] [{$server}] {$rule->name}");
         });
@@ -223,9 +223,10 @@ class AlertEvaluator
             return;
         }
 
+        $server = $this->getServerIdentifier();
         Http::post("https://api.telegram.org/bot{$botToken}/sendMessage", [
             'chat_id' => $chatId,
-            'text' => $this->prependServerIp($message),
+            'text' => "[{$server}] " . $message,
             'parse_mode' => 'HTML',
         ]);
     }
@@ -238,7 +239,8 @@ class AlertEvaluator
             return;
         }
 
-        Http::post($webhookUrl, ['text' => $this->prependServerIp($message)]);
+        $server = $this->getServerIdentifier();
+        Http::post($webhookUrl, ['text' => "[{$server}] " . $message]);
     }
 
     private function sendDiscord(string $message): void
@@ -249,7 +251,8 @@ class AlertEvaluator
             return;
         }
 
-        Http::post($webhookUrl, ['content' => $this->prependServerIp($message)]);
+        $server = $this->getServerIdentifier();
+        Http::post($webhookUrl, ['content' => "[{$server}] " . $message]);
     }
 
 
@@ -267,7 +270,7 @@ class AlertEvaluator
             'category' => $rule->category ?? 'resource',
             'rule' => $rule->name,
             'metric' => $rule->metric,
-            'message' => $this->prependServerIp($message),
+            'message' => $message,
             'server' => $this->getServerIdentifier(),
             'timestamp' => now()->toIso8601String(),
         ];
@@ -281,51 +284,7 @@ class AlertEvaluator
      */
     private function getServerIdentifier(): string
     {
-        $configured = config('monitoring.server_ip');
-        if (is_string($configured) && filter_var($configured, FILTER_VALIDATE_IP)) {
-            return $configured;
-        }
-
-        $cached = Cache::get('monitoring:public_ip');
-        if (is_string($cached) && filter_var($cached, FILTER_VALIDATE_IP)) {
-            return $cached;
-        }
-
-        $detected = $this->detectPublicIp();
-        if ($detected !== null) {
-            Cache::put('monitoring:public_ip', $detected, now()->addHours(6));
-            return $detected;
-        }
-
-        return gethostname();
-    }
-
-    private function prependServerIp(string $message): string
-    {
-        return "Server IP: {$this->getServerIdentifier()}\n{$message}";
-    }
-
-    private function detectPublicIp(): ?string
-    {
-        try {
-            $resp = Http::timeout(2)->withHeaders(['Metadata-Flavor' => 'Google'])->get('http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip');
-            $ip = trim((string) $resp->body());
-            if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                return $ip;
-            }
-        } catch (\Throwable $e) {}
-
-        foreach (['https://api.ipify.org', 'https://ifconfig.me/ip'] as $url) {
-            try {
-                $resp = Http::timeout(2)->get($url);
-                $ip = trim((string) $resp->body());
-                if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                    return $ip;
-                }
-            } catch (\Throwable $e) {}
-        }
-
-        return null;
+        return config('monitoring.server_ip') ?: gethostname();
     }
 
     /**
