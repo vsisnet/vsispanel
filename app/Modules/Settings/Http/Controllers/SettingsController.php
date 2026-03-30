@@ -70,7 +70,7 @@ class SettingsController extends Controller
     public function testNotification(Request $request): JsonResponse
     {
         $request->validate([
-            'channel' => ['required', 'string', Rule::in(['email', 'telegram', 'slack', 'discord'])],
+            'channel' => ['required', 'string', Rule::in(['email', 'telegram', 'slack', 'discord', 'openclaw'])],
         ]);
 
         $channel = $request->input('channel');

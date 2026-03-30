@@ -191,6 +191,7 @@ class AlertEvaluator
             'telegram' => $this->sendTelegram($message),
             'slack' => $this->sendSlack($message),
             'discord' => $this->sendDiscord($message),
+            'openclaw' => $this->sendOpenClaw($rule, $message),
             default => Log::warning("Unknown notification channel: {$channel}"),
         };
     }
@@ -246,6 +247,29 @@ class AlertEvaluator
         }
 
         Http::post($webhookUrl, ['content' => $message]);
+    }
+
+
+    private function sendOpenClaw(AlertRule $rule, string $message): void
+    {
+        $webhookUrl = config('monitoring.openclaw_webhook_url');
+
+        if (! $webhookUrl) {
+            return;
+        }
+
+        $payload = [
+            'source' => 'vsispanel',
+            'severity' => $rule->severity ?? 'warning',
+            'category' => $rule->category ?? 'resource',
+            'rule' => $rule->name,
+            'metric' => $rule->metric,
+            'message' => $message,
+            'server' => gethostname(),
+            'timestamp' => now()->toIso8601String(),
+        ];
+
+        Http::timeout(10)->post($webhookUrl, $payload);
     }
 
     /**

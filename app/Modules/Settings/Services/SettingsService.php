@@ -23,6 +23,7 @@ class SettingsService
         'notifications.telegram.chat_id' => 'monitoring.telegram_chat_id',
         'notifications.slack.webhook_url' => 'monitoring.slack_webhook_url',
         'notifications.discord.webhook_url' => 'monitoring.discord_webhook_url',
+        'notifications.openclaw.webhook_url' => 'monitoring.openclaw_webhook_url',
     ];
 
     public function __construct(

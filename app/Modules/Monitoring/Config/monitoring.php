@@ -20,6 +20,9 @@ return [
     // Discord Webhook
     'discord_webhook_url' => env('MONITORING_DISCORD_WEBHOOK_URL'),
 
+    // OpenClaw AI Agent Webhook
+    'openclaw_webhook_url' => env('MONITORING_OPENCLAW_WEBHOOK_URL'),
+
     // Managed services to monitor
     'services' => [
         'nginx' => 'nginx',

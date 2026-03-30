@@ -2092,6 +2092,8 @@
       "slackWebhookUrl": "Webhook URL",
       "discord": "Discord",
       "discordWebhookUrl": "Webhook URL",
+      "openclaw": "OpenClaw AI Webhook",
+      "openclawWebhookUrl": "URL Webhook",
       "enabled": "Bật",
       "disabled": "Tắt",
       "test": "Thử",

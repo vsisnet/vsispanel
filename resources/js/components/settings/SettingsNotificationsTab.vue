@@ -513,6 +513,55 @@
       </div>
     </VCard>
 
+
+    <!-- OpenClaw AI Webhook Channel -->
+    <VCard>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.9 1 3 1.9 3 3V19C3 20.1 3.9 21 5 21H11V19H5V3H13V9H21ZM14 21H16L18.5 18.5L20.5 20.5L23 18L20.5 15.5L18.5 17.5L16 15V21ZM14 10V12H20V10H14ZM14 13V15H17V13H14Z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ $t('settings.notifications.openclaw') }}
+            </h3>
+          </div>
+        </div>
+        <button
+          @click="form.openclaw.enabled = !form.openclaw.enabled"
+          :class="[
+            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+            form.openclaw.enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+          ]"
+        >
+          <span :class="[
+            'inline-block h-4 w-4 rounded-full bg-white transition-transform',
+            form.openclaw.enabled ? 'translate-x-6' : 'translate-x-1'
+          ]" />
+        </button>
+      </div>
+
+      <div v-if="form.openclaw.enabled" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {{ $t('settings.notifications.openclawWebhookUrl') }}
+          </label>
+          <input
+            v-model="form.openclaw.webhook_url"
+            type="url"
+            placeholder="http://localhost:9199"
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        <div class="flex justify-end">
+          <VButton variant="secondary" size="sm" :loading="testing === 'openclaw'" @click="testChannel('openclaw')">
+            {{ $t('settings.notifications.test') }}
+          </VButton>
+        </div>
+      </div>
+    </VCard>
     <!-- Save Notification Channels Button -->
     <div class="flex justify-end">
       <VButton variant="primary" :loading="saving" @click="saveSettings">
@@ -597,6 +646,7 @@ const form = ref({
   telegram: { enabled: false, bot_token: '', chat_id: '' },
   slack: { enabled: false, webhook_url: '' },
   discord: { enabled: false, webhook_url: '' },
+  openclaw: { enabled: false, webhook_url: '' },
 })
 const saving = ref(false)
 const testing = ref(null)
@@ -644,6 +694,8 @@ watch(() => props.settings, (settings) => {
     form.value.slack.webhook_url = n['slack.webhook_url'] ?? ''
     form.value.discord.enabled = n['discord.enabled'] ?? false
     form.value.discord.webhook_url = n['discord.webhook_url'] ?? ''
+    form.value.openclaw.enabled = n['openclaw.enabled'] ?? false
+      form.value.openclaw.webhook_url = n['openclaw.webhook_url'] ?? ''
   }
 }, { immediate: true })
 
@@ -790,6 +842,7 @@ async function saveSettings() {
       'notifications.slack.enabled': form.value.slack.enabled,
       'notifications.slack.webhook_url': form.value.slack.webhook_url,
       'notifications.discord.enabled': form.value.discord.enabled,
+      'notifications.openclaw.enabled': form.value.openclaw.enabled,      'notifications.openclaw.webhook_url': form.value.openclaw.webhook_url,
       'notifications.discord.webhook_url': form.value.discord.webhook_url,
     })
     if (data.success) {
