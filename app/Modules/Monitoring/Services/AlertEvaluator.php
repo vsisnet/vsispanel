@@ -127,9 +127,11 @@ class AlertEvaluator
     private function triggerAlert(AlertRule $rule, float $currentValue, ?string $message = null): void
     {
         $severityLabel = strtoupper($rule->severity ?? 'WARNING');
+        $server = $this->getServerIdentifier();
         $alertMessage = $message ?? sprintf(
-            '[%s] %s - %s is %s %.1f (threshold: %s %.1f)',
+            '[%s] [%s] %s - %s is %s %.1f (threshold: %s %.1f)',
             $severityLabel,
+            $server,
             $rule->name,
             $rule->metric,
             $rule->condition,
@@ -207,7 +209,8 @@ class AlertEvaluator
         $severity = strtoupper($rule->severity ?? 'WARNING');
 
         Mail::raw($message, function ($mail) use ($to, $rule, $severity) {
-            $mail->to($to)->subject("[VSISPanel {$severity}] {$rule->name}");
+            $server = $this->getServerIdentifier();
+            $mail->to($to)->subject("[VSISPanel {$severity}] [{$server}] {$rule->name}");
         });
     }
 
@@ -220,9 +223,10 @@ class AlertEvaluator
             return;
         }
 
+        $server = $this->getServerIdentifier();
         Http::post("https://api.telegram.org/bot{$botToken}/sendMessage", [
             'chat_id' => $chatId,
-            'text' => $message,
+            'text' => "[{$server}] " . $message,
             'parse_mode' => 'HTML',
         ]);
     }
@@ -235,7 +239,8 @@ class AlertEvaluator
             return;
         }
 
-        Http::post($webhookUrl, ['text' => $message]);
+        $server = $this->getServerIdentifier();
+        Http::post($webhookUrl, ['text' => "[{$server}] " . $message]);
     }
 
     private function sendDiscord(string $message): void
@@ -246,7 +251,8 @@ class AlertEvaluator
             return;
         }
 
-        Http::post($webhookUrl, ['content' => $message]);
+        $server = $this->getServerIdentifier();
+        Http::post($webhookUrl, ['content' => "[{$server}] " . $message]);
     }
 
 
@@ -265,11 +271,20 @@ class AlertEvaluator
             'rule' => $rule->name,
             'metric' => $rule->metric,
             'message' => $message,
-            'server' => gethostname(),
+            'server' => $this->getServerIdentifier(),
             'timestamp' => now()->toIso8601String(),
         ];
 
         Http::timeout(10)->post($webhookUrl, $payload);
+    }
+
+
+    /**
+     * Get server public IP or hostname for alert identification.
+     */
+    private function getServerIdentifier(): string
+    {
+        return config('monitoring.server_ip') ?: gethostname();
     }
 
     /**

@@ -23,6 +23,9 @@ return [
     // OpenClaw AI Agent Webhook
     'openclaw_webhook_url' => env('MONITORING_OPENCLAW_WEBHOOK_URL'),
 
+    // Server public IP (used in all alert notifications)
+    'server_ip' => env('MONITORING_SERVER_IP'),
+
     // Managed services to monitor
     'services' => [
         'nginx' => 'nginx',
