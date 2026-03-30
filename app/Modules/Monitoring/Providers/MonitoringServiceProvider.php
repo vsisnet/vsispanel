@@ -18,6 +18,7 @@ class MonitoringServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../Config/monitoring.php', 'monitoring');
         $this->app->singleton(MetricsCollector::class);
         $this->app->singleton(ResourceEvaluator::class);
         $this->app->singleton(ServiceDownEvaluator::class);
