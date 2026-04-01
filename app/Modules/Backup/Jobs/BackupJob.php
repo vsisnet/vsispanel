@@ -79,7 +79,8 @@ class BackupJob implements ShouldQueue
                     $remoteName = $this->getRemoteName($destination, $config);
                     if ($remoteName) {
                         $this->updateTask(60, "Uploading to {$remoteName}...");
-                        $uploadResult = $backupService->uploadToRemote($archivePaths, $remoteName);
+                        $remotePath = $this->getRemotePath($destination);
+                        $uploadResult = $backupService->uploadToRemote($archivePaths, $remoteName, $remotePath);
                         
                         Log::info('Upload result', [
                             'backup_id' => $this->backup->id,
@@ -98,7 +99,8 @@ class BackupJob implements ShouldQueue
             foreach ($destinations as $destination) {
                 $remoteName = $this->getRemoteName($destination, $config);
                 if ($remoteName) {
-                    $backupService->applyRetention($remoteName, 'backups', $keepLast);
+                    $remotePath = $this->getRemotePath($destination);
+                    $backupService->applyRetention($remoteName, $remotePath, $keepLast);
                 }
             }
 
@@ -135,11 +137,22 @@ class BackupJob implements ShouldQueue
         // Format: "remote:<storage_remote_id>" or just remote name
         if (str_starts_with($destination, 'remote:')) {
             $remoteId = substr($destination, 7);
-            // Look up in storage_remotes table
             $remote = \App\Modules\Backup\Models\StorageRemote::find($remoteId);
-            return $remote?->name;
+            return $remote?->getRcloneRemoteName();
         }
         return $destination;
+    }
+
+    protected function getRemotePath(string $destination): string
+    {
+        if (str_starts_with($destination, 'remote:')) {
+            $remoteId = substr($destination, 7);
+            $remote = \App\Modules\Backup\Models\StorageRemote::find($remoteId);
+            if ($remote && !empty($remote->config['path'])) {
+                return trim($remote->config['path'], '/');
+            }
+        }
+        return 'backups';
     }
 
     protected function updateTask(int $progress, string $message): void
