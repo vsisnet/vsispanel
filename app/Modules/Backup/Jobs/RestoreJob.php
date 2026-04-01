@@ -96,26 +96,38 @@ class RestoreJob implements ShouldQueue
         }
 
         if ($restoreSource['source'] === 'remote') {
-            $this->updateTask(15, 'Syncing backup from remote storage...');
+            $this->updateTask(15, 'Downloading backup from remote storage...');
 
-            $syncResult = $this->syncFromRemote($backup, $rcloneService);
+            $config = $backup->backupConfig;
+            $destinations = $config->destinations ?? [];
+            $downloaded = false;
 
-            if (!$syncResult['success']) {
-                $error = 'Failed to sync from remote: ' . ($syncResult['error'] ?? 'Unknown error');
-                $this->restoreOperation->markAsFailed($error);
-                $this->failTask($error);
+            foreach ($destinations as $destination) {
+                if (str_starts_with($destination, 'remote:')) {
+                    $remoteId = substr($destination, 7);
+                    $remote = StorageRemote::find($remoteId);
+                    if (!$remote) continue;
 
-                Log::error('Failed to sync backup from remote', [
-                    'restore_operation_id' => $this->restoreOperation->id,
-                    'backup_id' => $backup->id,
-                    'error' => $syncResult['error'] ?? 'Unknown error',
-                ]);
-                return;
+                    $remoteName = $remote->getRcloneRemoteName();
+                    $remotePath = trim($remote->config['path'] ?? 'backups', '/');
+
+                    $this->updateTask(20, "Downloading from {$remote->display_name}...");
+
+                    $dlResult = $backupService->downloadFromRemote($remoteName, $remotePath, $backup->snapshot_id);
+                    if ($dlResult['success']) {
+                        $downloaded = true;
+                        $this->updateTask(40, 'Download completed.');
+                        break;
+                    }
+                }
             }
 
-            $this->updateTask(40, 'Remote sync completed. Extracting files...');
-        } elseif ($restoreSource['source'] === 'local_restic') {
-            $this->updateTask(20, 'Extracting files from local restic backup...');
+            if (!$downloaded) {
+                $error = 'Failed to download backup from any remote';
+                $this->restoreOperation->markAsFailed($error);
+                $this->failTask($error);
+                return;
+            }
         }
 
         $result = $backupService->restore(
@@ -210,50 +222,31 @@ class RestoreJob implements ShouldQueue
     {
         $config = $backup->backupConfig;
         $metadata = $backup->metadata ?? [];
+        $snapshotId = $backup->snapshot_id;
 
-        // 1. Check if snapshot exists in local restic repository
-        if ($config) {
-            $snapshotExists = $backupService->snapshotExists($config, $backup->snapshot_id);
-            if ($snapshotExists) {
-                Log::debug('Snapshot found in local restic repository', [
-                    'backup_id' => $backup->id,
-                    'snapshot_id' => $backup->snapshot_id,
-                ]);
-                return ['source' => 'local_restic'];
+        // 1. Check if local archive files exist (simple flow: /tmp/vsispanel_backups/*_<snapshot>*)
+        if ($snapshotId && $backupService->snapshotExists($config, $snapshotId)) {
+            Log::info('Local archive files found', [
+                'backup_id' => $backup->id,
+                'snapshot_id' => $snapshotId,
+            ]);
+            return ['source' => 'local_archive'];
+        }
+
+        // 2. Check metadata archives
+        $archives = $metadata['archives'] ?? [];
+        foreach ($archives as $path) {
+            if (is_string($path) && file_exists($path)) {
+                return ['source' => 'local_archive'];
             }
         }
 
-        // 2. Check if local archive exists
-        $localArchivePath = $metadata['local_archive']['path'] ?? null;
-        $archiveName = $metadata['archive']['name'] ?? null;
-
-        // Also check default location
-        if (!$localArchivePath && $archiveName) {
-            $localArchivePath = "/var/backups/vsispanel-archives/{$archiveName}";
-        }
-
-        if ($localArchivePath && file_exists($localArchivePath)) {
-            Log::info('Local archive found', [
-                'backup_id' => $backup->id,
-                'archive_path' => $localArchivePath,
-            ]);
-            return [
-                'source' => 'local_archive',
-                'path' => $localArchivePath,
-            ];
-        }
-
-        // 3. Check if we have synced remotes
-        $syncedRemotes = $backup->synced_remotes ?? [];
-        if (!empty($syncedRemotes)) {
-            Log::info('Will restore from remote storage', [
-                'backup_id' => $backup->id,
-                'synced_remotes' => $syncedRemotes,
-            ]);
+        // 3. Try remote download
+        $destinations = $config->destinations ?? [];
+        if (!empty($destinations)) {
             return ['source' => 'remote'];
         }
 
-        // No restore source available - will fail at restore step
         Log::warning('No restore source available', ['backup_id' => $backup->id]);
         return ['source' => 'none'];
     }

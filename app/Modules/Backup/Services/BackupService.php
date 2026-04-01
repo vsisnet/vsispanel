@@ -285,8 +285,10 @@ class BackupService
         }
 
         try {
-            $mysqlCreds = $this->getMysqlCredentials();
-            $cmd = "gunzip -c '{$archivePath}' | mysql -u{$mysqlCreds['user']} -p'{$mysqlCreds['password']}'";
+            // Extract database name from filename: db_<dbname>_<timestamp>.sql.gz
+            $dbName = $this->extractDbNameFromArchive($archivePath);
+            $dbFlag = $dbName ? " {$dbName}" : '';
+            $cmd = "gunzip -c '{$archivePath}' | mysql --defaults-file=/etc/mysql/vsispanel.cnf{$dbFlag}";
             
             $process = Process::fromShellCommandline($cmd);
             $process->setTimeout(self::DEFAULT_TIMEOUT);
@@ -486,4 +488,200 @@ class BackupService
             'message' => 'Repository OK',
         ];
     }
+
+    /**
+     * Check if a snapshot/archive exists locally
+     */
+    public function snapshotExists(BackupConfig $config, ?string $snapshotId): bool
+    {
+        if (!$snapshotId) {
+            return false;
+        }
+
+        // Check for archives matching the snapshot timestamp
+        $pattern = self::ARCHIVE_DIR . "/*_{$snapshotId}.*";
+        $matches = glob($pattern);
+        return !empty($matches);
+    }
+
+    /**
+     * Restore a backup (databases and/or files)
+     */
+    public function restore(Backup $backup, string $targetPath, array $includePaths = []): array
+    {
+        $snapshotId = $backup->snapshot_id;
+        $metadata = $backup->metadata ?? [];
+        $archives = $metadata['archives'] ?? [];
+        $config = $backup->backupConfig;
+        $backupItems = $config->backup_items ?? ['databases', 'files'];
+        $results = [];
+        $totalFiles = 0;
+        $totalBytes = 0;
+
+        Log::info('Starting restore', [
+            'backup_id' => $backup->id,
+            'snapshot_id' => $snapshotId,
+            'target_path' => $targetPath,
+            'backup_items' => $backupItems,
+        ]);
+
+        // Find archive files - check local first, then metadata paths
+        $archiveFiles = $this->findArchiveFiles($snapshotId, $archives);
+
+        if (empty($archiveFiles['db']) && empty($archiveFiles['files'])) {
+            return ['success' => false, 'error' => 'No archive files found for snapshot: ' . $snapshotId];
+        }
+
+        // Restore databases
+        if (in_array('databases', $backupItems) && !empty($archiveFiles['db'])) {
+            foreach ($archiveFiles['db'] as $dbArchive) {
+                if (!empty($includePaths) && !$this->matchesIncludePaths($dbArchive, $includePaths)) {
+                    continue;
+                }
+                $dbResult = $this->restoreDatabase($dbArchive);
+                $results[] = $dbResult;
+                if ($dbResult['success']) {
+                    $totalFiles++;
+                    $totalBytes += filesize($dbArchive) ?: 0;
+                }
+            }
+        }
+
+        // Restore files
+        if (in_array('files', $backupItems) && !empty($archiveFiles['files'])) {
+            foreach ($archiveFiles['files'] as $fileArchive) {
+                $fileResult = $this->restoreFiles($fileArchive, $targetPath);
+                $results[] = $fileResult;
+                if ($fileResult['success']) {
+                    $totalFiles++;
+                    $totalBytes += filesize($fileArchive) ?: 0;
+                }
+            }
+        }
+
+        $hasErrors = collect($results)->contains(fn($r) => !$r['success']);
+
+        return [
+            'success' => !$hasErrors || $totalFiles > 0,
+            'output' => "Restored {$totalFiles} archives (" . $this->formatBytesHelper($totalBytes) . ")",
+            'files_restored' => $totalFiles,
+            'bytes_restored' => $totalBytes,
+            'results' => $results,
+        ];
+    }
+
+    /**
+     * Find archive files for a given snapshot ID
+     */
+    protected function findArchiveFiles(?string $snapshotId, array $metadataArchives = []): array
+    {
+        $dbFiles = [];
+        $fileArchives = [];
+
+        // Search in local archive dir
+        if ($snapshotId && is_dir(self::ARCHIVE_DIR)) {
+            $allFiles = glob(self::ARCHIVE_DIR . "/*_{$snapshotId}*");
+            foreach ($allFiles as $file) {
+                $basename = basename($file);
+                if (str_starts_with($basename, 'db_')) {
+                    $dbFiles[] = $file;
+                } elseif (str_starts_with($basename, 'files_')) {
+                    $fileArchives[] = $file;
+                }
+            }
+        }
+
+        // Also check metadata paths if local not found
+        if (empty($dbFiles) && empty($fileArchives)) {
+            foreach ($metadataArchives as $path) {
+                if (is_string($path) && file_exists($path)) {
+                    $basename = basename($path);
+                    if (str_starts_with($basename, 'db_')) {
+                        $dbFiles[] = $path;
+                    } elseif (str_starts_with($basename, 'files_')) {
+                        $fileArchives[] = $path;
+                    }
+                }
+            }
+        }
+
+        return ['db' => $dbFiles, 'files' => $fileArchives];
+    }
+
+    /**
+     * Download archive files from remote storage
+     */
+    public function downloadFromRemote(string $remoteName, string $remotePath, string $snapshotId): array
+    {
+        $this->ensureDirectories();
+        $downloadedFiles = [];
+
+        // List files matching snapshot
+        $listCmd = "rclone --config /etc/rclone/rclone.conf lsf '{$remoteName}:{$remotePath}/' 2>/dev/null | grep '{$snapshotId}'";
+        $process = Process::fromShellCommandline($listCmd);
+        $process->setTimeout(120);
+        $process->run();
+
+        $files = array_filter(explode("\n", trim($process->getOutput())));
+
+        if (empty($files)) {
+            return ['success' => false, 'error' => "No files found on remote for snapshot {$snapshotId}"];
+        }
+
+        foreach ($files as $fileName) {
+            $fileName = trim($fileName);
+            if (empty($fileName)) continue;
+
+            $localPath = self::ARCHIVE_DIR . '/' . $fileName;
+            $copyCmd = "rclone --config /etc/rclone/rclone.conf copy '{$remoteName}:{$remotePath}/{$fileName}' '" . self::ARCHIVE_DIR . "/' 2>&1";
+            $process = Process::fromShellCommandline($copyCmd);
+            $process->setTimeout(self::DEFAULT_TIMEOUT);
+            $process->run();
+
+            if ($process->isSuccessful() && file_exists($localPath)) {
+                $downloadedFiles[] = $localPath;
+                Log::info("Downloaded from remote: {$fileName}");
+            } else {
+                Log::error("Failed to download: {$fileName}", ['error' => $process->getErrorOutput()]);
+            }
+        }
+
+        return [
+            'success' => !empty($downloadedFiles),
+            'files' => $downloadedFiles,
+        ];
+    }
+
+    protected function matchesIncludePaths(string $archivePath, array $includePaths): bool
+    {
+        $basename = basename($archivePath);
+        foreach ($includePaths as $pattern) {
+            if (str_contains($basename, $pattern)) {
+                return true;
+            }
+        }
+        return empty($includePaths);
+    }
+
+
+    protected function extractDbNameFromArchive(string $archivePath): ?string
+    {
+        $basename = basename($archivePath);
+        // Pattern: db_<dbname>_<YYYY-MM-DD_HH-ii-ss>.sql.gz
+        if (preg_match('/^db_(.+)_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql\.gz$/', $basename, $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+    protected function formatBytesHelper(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+        return round($bytes, 2) . ' ' . $units[$i];
+    }
+
 }
