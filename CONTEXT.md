@@ -49,3 +49,14 @@
 
 ## UI Rules
 - NO unicode emoji — use SVG icons (heroicons) or text labels only
+
+## Backup Module Refactor (2026-04-01)
+- Replaced Restic-based backup with simple mysqldump + tar + rclone flow
+- Synced BackupService.php and BackupJob.php from Production (34.155.38.90)
+- Key changes:
+  - BackupService: mysqldump per DB -> .sql.gz, tar -cf (no compress) for files
+  - BackupJob: tries=1, timeout=10800s, no backoff
+  - CPU-friendly: nice -n 19 ionice -c 3
+- Reason: Restic caused CPU spikes on 2 vCPU servers
+- Production backup running successfully with this flow since 2026-03-29
+- Updated by: Phát (AI Assistant)

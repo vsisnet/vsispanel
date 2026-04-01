@@ -122,3 +122,21 @@ Xem chi tiết từng phase trong thư mục `docs/workflows/`:
 
 ### UI Rules
 - NEVER use unicode emoji in UI — use SVG icons (heroicons) or plain text labels
+
+## Backup Module (Updated 2026-04-01)
+
+### Flow đã thay đổi - Simple Backup (synced from Production)
+- **Không còn dùng Restic/Borg** - đã chuyển sang simple flow:
+  - Database: `mysqldump` per DB → `.sql.gz`
+  - Files: `nice -n 19 ionice -c 3 tar -cf` (không nén, giảm CPU)
+  - Upload: `rclone` to remote storage
+  - Restore DB: `gunzip -c | mysql`
+  - Restore files: `tar -xf`
+- **BackupJob tuning:**
+  - `tries = 1` (không retry tự động)
+  - `timeout = 10800` (3 giờ)
+  - Queue: `backups`
+- **Horizon supervisor-backups:** `maxProcesses=1`, `tries=1`, `timeout=10800`
+- **Lý do thay đổi:** Restic gây CPU spike trên server nhỏ (2 vCPU), simple flow đã chạy thành công trên Production
+- **Synced from:** aventure-vietnam.com (34.155.38.90)
+- Updated by: Phát (AI Assistant)
