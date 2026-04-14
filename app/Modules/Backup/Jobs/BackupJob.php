@@ -111,6 +111,8 @@ class BackupJob implements ShouldQueue
             // Done!
             $this->updateTask(100, 'Backup completed successfully.');
             $this->completeTask('Backup completed');
+            // Mark backup record as completed
+            $this->backup->update(["status" => "completed", "completed_at" => now()]);
 
             Log::info('BackupJob completed', [
                 'backup_id' => $this->backup->id,
