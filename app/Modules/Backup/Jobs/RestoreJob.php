@@ -139,21 +139,9 @@ class RestoreJob implements ShouldQueue
         if ($result['success']) {
             $this->updateTask(80, 'Files extracted. Processing results...');
 
-            // Parse the output to get files/bytes restored
+            $filesRestored = $result['files_restored'] ?? 0;
+            $bytesRestored = $result['bytes_restored'] ?? 0;
             $output = $result['output'] ?? '';
-            $filesRestored = 0;
-            $bytesRestored = 0;
-
-            // Parse restic output: "Summary: Restored 890 files/dirs (228.793 MiB) in 0:01"
-            if (preg_match('/Restored\s+(\d+)\s+/', $output, $matches)) {
-                $filesRestored = (int) $matches[1];
-            }
-            if (preg_match('/\(([\d.]+)\s*(B|KiB|MiB|GiB|TiB)\)/', $output, $matches)) {
-                $size = (float) $matches[1];
-                $unit = $matches[2];
-                $multipliers = ['B' => 1, 'KiB' => 1024, 'MiB' => 1024 * 1024, 'GiB' => 1024 * 1024 * 1024, 'TiB' => 1024 * 1024 * 1024 * 1024];
-                $bytesRestored = (int) ($size * ($multipliers[$unit] ?? 1));
-            }
 
             $this->restoreOperation->markAsCompleted($filesRestored, $bytesRestored, $output);
 
@@ -252,199 +240,13 @@ class RestoreJob implements ShouldQueue
     }
 
     /**
-     * Restore from local archive (extract to restic repository)
+     * Restore from local archive (simple flow)
      */
     protected function restoreFromLocalArchive(Backup $backup, RcloneService $rcloneService): array
     {
-        $config = $backup->backupConfig;
-        $metadata = $backup->metadata ?? [];
-
-        if (!$config) {
-            return [
-                'success' => false,
-                'error' => 'Backup configuration not found',
-            ];
-        }
-
-        // Get archive path
-        $localArchivePath = $metadata['local_archive']['path'] ?? null;
-        $archiveName = $metadata['archive']['name'] ?? null;
-
-        if (!$localArchivePath && $archiveName) {
-            $localArchivePath = "/var/backups/vsispanel-archives/{$archiveName}";
-        }
-
-        if (!$localArchivePath || !file_exists($localArchivePath)) {
-            return [
-                'success' => false,
-                'error' => 'Local archive not found',
-            ];
-        }
-
-        // Get local restic path from config
-        $destinationConfig = $config->destination_config ?? [];
-        $localPath = $destinationConfig['path'] ?? '/var/backups/vsispanel';
-
-        Log::info('Extracting local archive', [
-            'backup_id' => $backup->id,
-            'archive_path' => $localArchivePath,
-            'target_path' => $localPath,
-        ]);
-
-        $this->updateTask(20, 'Extracting local archive...');
-
-        // Extract archive to restic repository path
-        $extractResult = $rcloneService->extractBackupArchive($localArchivePath, $localPath);
-
-        if ($extractResult['success']) {
-            Log::info('Successfully extracted local archive', [
-                'backup_id' => $backup->id,
-                'archive_path' => $localArchivePath,
-            ]);
-            return ['success' => true];
-        }
-
-        Log::warning('Failed to extract local archive', [
-            'backup_id' => $backup->id,
-            'error' => $extractResult['error'] ?? 'Unknown error',
-        ]);
-
-        return [
-            'success' => false,
-            'error' => $extractResult['error'] ?? 'Failed to extract archive',
-        ];
-    }
-
-    /**
-     * Sync backup from remote storage to local (download and extract archive)
-     */
-    protected function syncFromRemote(Backup $backup, RcloneService $rcloneService): array
-    {
-        $syncedRemotes = $backup->synced_remotes ?? [];
-        $config = $backup->backupConfig;
-        $metadata = $backup->metadata ?? [];
-
-        if (empty($syncedRemotes)) {
-            return [
-                'success' => false,
-                'error' => 'No synced remotes available',
-            ];
-        }
-
-        if (!$config) {
-            return [
-                'success' => false,
-                'error' => 'Backup configuration not found',
-            ];
-        }
-
-        // Get archive name from metadata
-        $archiveName = $metadata['remote_sync']['archive_name'] ?? null;
-
-        // Get local backup path from config
-        $destinationConfig = $config->destination_config ?? [];
-        $localPath = $destinationConfig['path'] ?? '/var/backups/vsispanel';
-
-        // Try each synced remote until one succeeds
-        foreach ($syncedRemotes as $remoteId) {
-            $remote = StorageRemote::find($remoteId);
-            if (!$remote) {
-                Log::warning('Synced remote not found', ['remote_id' => $remoteId]);
-                continue;
-            }
-
-            $rcloneName = $remote->getRcloneRemoteName();
-            $basePath = trim($remote->config['path'] ?? '/backups', '/');
-
-            // Check if we have an archive (new format) or folder (old format)
-            if ($archiveName) {
-                // New format: Download and extract archive
-                $remotePath = "{$rcloneName}:{$basePath}/{$archiveName}";
-                $tempDir = sys_get_temp_dir();
-                $localArchivePath = "{$tempDir}/{$archiveName}";
-
-                Log::info('Downloading backup archive from remote', [
-                    'backup_id' => $backup->id,
-                    'remote_name' => $remote->display_name,
-                    'archive_name' => $archiveName,
-                    'remote_path' => $remotePath,
-                ]);
-
-                $this->updateTask(20, "Downloading archive from {$remote->display_name}...");
-
-                $downloadResult = $rcloneService->downloadFile($remotePath, $localArchivePath);
-
-                if (!$downloadResult['success']) {
-                    Log::warning('Failed to download archive, trying next remote', [
-                        'backup_id' => $backup->id,
-                        'remote_name' => $remote->display_name,
-                        'error' => $downloadResult['error'] ?? 'Unknown error',
-                    ]);
-                    continue;
-                }
-
-                $this->updateTask(30, "Extracting backup archive...");
-
-                // Extract archive to local path
-                $extractResult = $rcloneService->extractBackupArchive($localArchivePath, $localPath);
-
-                // Clean up downloaded archive
-                if (file_exists($localArchivePath)) {
-                    unlink($localArchivePath);
-                }
-
-                if ($extractResult['success']) {
-                    Log::info('Successfully restored backup from remote archive', [
-                        'backup_id' => $backup->id,
-                        'remote_name' => $remote->display_name,
-                        'archive_name' => $archiveName,
-                    ]);
-
-                    return ['success' => true];
-                }
-
-                Log::warning('Failed to extract archive, trying next remote', [
-                    'backup_id' => $backup->id,
-                    'remote_name' => $remote->display_name,
-                    'error' => $extractResult['error'] ?? 'Unknown error',
-                ]);
-            } else {
-                // Old format: Sync folder directly (backward compatibility)
-                $backupFolderName = 'vsispanel-backup-' . $config->id;
-                $remotePath = "{$rcloneName}:{$basePath}/{$backupFolderName}";
-
-                Log::info('Syncing backup folder from remote (old format)', [
-                    'backup_id' => $backup->id,
-                    'remote_name' => $remote->display_name,
-                    'remote_path' => $remotePath,
-                    'local_path' => $localPath,
-                ]);
-
-                $this->updateTask(25, "Downloading backup from {$remote->display_name}...");
-
-                $result = $rcloneService->syncFromRemote($remotePath, $localPath);
-
-                if ($result['success']) {
-                    Log::info('Successfully synced backup from remote', [
-                        'backup_id' => $backup->id,
-                        'remote_name' => $remote->display_name,
-                    ]);
-
-                    return ['success' => true];
-                }
-
-                Log::warning('Failed to sync from remote, trying next', [
-                    'backup_id' => $backup->id,
-                    'remote_name' => $remote->display_name,
-                    'error' => $result['error'] ?? 'Unknown error',
-                ]);
-            }
-        }
-
-        return [
-            'success' => false,
-            'error' => 'Failed to restore from all available remotes',
-        ];
+        // Simple flow: archive files are already in /tmp/vsispanel_backups/
+        // BackupService::restore() handles finding and restoring them
+        return ['success' => true];
     }
 
     /**

@@ -139,7 +139,7 @@ class BackupService
                 }
 
                 // Compress
-                $gzipCmd = "gzip -c '{$tempSqlFile}' > '{$archivePath}'";
+                $gzipCmd = "nice -n 19 ionice -c 3 gzip -1 -c '{$tempSqlFile}' > '{$archivePath}'";
                 Process::fromShellCommandline($gzipCmd)->setTimeout(600)->run();
 
                 @unlink($tempSqlFile);
@@ -487,6 +487,22 @@ class BackupService
             'success' => true,
             'message' => 'Repository OK',
         ];
+    }
+
+
+    /**
+     * Delete a snapshot (local archive files)
+     */
+    public function deleteSnapshot(BackupConfig $config, string $snapshotId): array
+    {
+        // Delete local archive files matching snapshot
+        $pattern = self::ARCHIVE_DIR . "/*_{$snapshotId}*";
+        $files = glob($pattern);
+        $deleted = 0;
+        foreach ($files as $file) {
+            if (@unlink($file)) $deleted++;
+        }
+        return ['success' => true, 'deleted' => $deleted];
     }
 
     /**
