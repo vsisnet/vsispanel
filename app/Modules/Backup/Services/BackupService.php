@@ -493,6 +493,48 @@ class BackupService
     /**
      * Delete a snapshot (local archive files)
      */
+    /**
+     * Browse files in a snapshot (list contents of archive files)
+     */
+    public function browseSnapshot(BackupConfig $config, string $snapshotId, string $path = '/'): array
+    {
+        $files = [];
+        // Find all archives for this snapshot
+        $pattern = self::ARCHIVE_DIR . "/*_{$snapshotId}*";
+        $archives = glob($pattern);
+
+        foreach ($archives as $archive) {
+            $basename = basename($archive);
+            if (str_starts_with($basename, 'db_')) {
+                // Database archive - show as single file
+                $dbName = $this->extractDbNameFromArchive($archive) ?? $basename;
+                $files[] = [
+                    'name' => "Database: {$dbName}",
+                    'path' => $archive,
+                    'type' => 'database',
+                    'size' => filesize($archive) ?: 0,
+                ];
+            } elseif (str_starts_with($basename, 'files_')) {
+                // Tar archive - list contents
+                $cmd = "tar -tf " . escapeshellarg($archive) . " 2>/dev/null | head -100";
+                $process = Process::fromShellCommandline($cmd);
+                $process->setTimeout(30);
+                $process->run();
+                $lines = array_filter(explode("\n", $process->getOutput()));
+                foreach ($lines as $line) {
+                    $files[] = [
+                        'name' => basename($line),
+                        'path' => $line,
+                        'type' => str_ends_with($line, '/') ? 'dir' : 'file',
+                        'size' => 0,
+                    ];
+                }
+            }
+        }
+
+        return ['success' => true, 'files' => $files];
+    }
+
     public function deleteSnapshot(BackupConfig $config, string $snapshotId): array
     {
         // Delete local archive files matching snapshot

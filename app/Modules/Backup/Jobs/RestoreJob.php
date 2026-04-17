@@ -32,6 +32,7 @@ class RestoreJob implements ShouldQueue
         public readonly RestoreOperation $restoreOperation,
         public readonly ?string $taskId = null
     ) {
+        $this->connection = 'redis-backups';
         $this->queue = 'backups';
     }
 

@@ -33,6 +33,7 @@ class BackupJob implements ShouldQueue
         public readonly Backup $backup,
         public readonly ?string $taskId = null
     ) {
+        $this->connection = 'redis-backups';
         $this->queue = 'backups';
     }
 

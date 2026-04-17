@@ -72,6 +72,15 @@ return [
             'after_commit' => false,
         ],
 
+        'redis-backups' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'backups',
+            'retry_after' => 12000, // > timeout 10800s (3h) to prevent duplicate retry
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
     ],
 
     /*
