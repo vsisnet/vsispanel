@@ -32,6 +32,33 @@ class User extends Authenticatable
     use LogsActivity;
 
     /**
+     * The "booted" method of the model.
+     * Auto-assign Spatie role based on role column.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            if ($user->role && $user->getRoleNames()->isEmpty()) {
+                try {
+                    $user->assignRole($user->role);
+                } catch (\Exception $e) {
+                    \Log::warning("Failed to auto-assign role to user {$user->id}: " . $e->getMessage());
+                }
+            }
+        });
+
+        static::updated(function (User $user) {
+            if ($user->wasChanged('role') && $user->role) {
+                try {
+                    $user->syncRoles([$user->role]);
+                } catch (\Exception $e) {
+                    \Log::warning("Failed to sync role for user {$user->id}: " . $e->getMessage());
+                }
+            }
+        });
+    }
+
+    /**
      * Default guard for spatie permission
      */
     protected string $guard_name = 'sanctum';
