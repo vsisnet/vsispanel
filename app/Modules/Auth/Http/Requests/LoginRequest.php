@@ -16,8 +16,24 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email', 'max:255'],
+            'login' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'string', 'max:255'],
+            'username' => ['sometimes', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:6'],
         ];
+    }
+
+    public function prepareForValidation(): void
+    {
+        // Accept 'login' or 'email' or 'username' field - use whichever is provided
+        if (!$this->has('login')) {
+            $login = $this->input('username') ?: $this->input('email');
+            if ($login) $this->merge(['login' => $login]);
+        }
+    }
+
+    public function getLoginField(): string
+    {
+        return $this->input('login', $this->input('username', $this->input('email', '')));
     }
 }

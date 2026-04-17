@@ -19,7 +19,7 @@ class CreateUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', 'email', 'max:255'],
             'username' => ['required', 'string', 'max:255', 'unique:users,username', 'regex:/^[a-zA-Z0-9_]+$/'],
             'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()],
             'role' => ['required', 'string', Rule::in(['admin', 'reseller', 'user'])],

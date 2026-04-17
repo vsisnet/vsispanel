@@ -26,8 +26,7 @@ class UpdateUserRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore($userId),
-            ],
+                ],
             'username' => [
                 'sometimes',
                 'string',

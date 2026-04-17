@@ -30,7 +30,7 @@ class LoginController extends Controller
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
 
-            $this->logLoginAttempt($request->email, false, 'Rate limited');
+            $this->logLoginAttempt($loginValue ?? $request->input("email", "unknown"), false, 'Rate limited');
 
             return response()->json([
                 'success' => false,
@@ -43,10 +43,11 @@ class LoginController extends Controller
 
         RateLimiter::hit($key, 60);
 
-        $user = User::where('email', $request->email)->first();
+        $loginValue = $request->input("login") ?: $request->input("username") ?: $request->input("email");
+        $user = User::where("username", $loginValue)->orWhere("email", $loginValue)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            $this->logLoginAttempt($request->email, false, 'Invalid credentials');
+            $this->logLoginAttempt($loginValue ?? $request->input("email", "unknown"), false, 'Invalid credentials');
 
             return response()->json([
                 'success' => false,
@@ -59,7 +60,7 @@ class LoginController extends Controller
 
         // Check if account is active
         if ($user->status !== 'active') {
-            $this->logLoginAttempt($request->email, false, "Account {$user->status}");
+            $this->logLoginAttempt($loginValue ?? $request->input("email", "unknown"), false, "Account {$user->status}");
 
             return response()->json([
                 'success' => false,
@@ -92,7 +93,7 @@ class LoginController extends Controller
         RateLimiter::clear($key);
         $token = $this->createTokenAndUpdateLogin($user, $request);
 
-        $this->logLoginAttempt($request->email, true);
+        $this->logLoginAttempt($loginValue ?? $request->input("email", "unknown"), true);
 
         return response()->json([
             'success' => true,
