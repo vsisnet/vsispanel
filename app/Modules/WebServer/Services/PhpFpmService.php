@@ -759,7 +759,7 @@ class PhpFpmService
         // Run in background to avoid killing the current PHP-FPM worker handling this request
         return $this->executor->executeAsRoot('bash', [
             '-c',
-            "sleep 1 && systemctl reload {$serviceName} &"
+            "(sleep 5 && systemctl reload {$serviceName}) >/dev/null 2>&1 </dev/null &"
         ]);
     }
 
