@@ -13,7 +13,7 @@
       <VButton
         variant="primary"
         :icon="PlusIcon"
-        @click="showCreateModal = true"
+        @click="router.push({ name: 'create-website' })"
       >
         {{ $t('websites.addDomain') }}
       </VButton>
@@ -115,7 +115,7 @@
           <VButton
             variant="primary"
             :icon="PlusIcon"
-            @click="showCreateModal = true"
+            @click="router.push({ name: 'create-website' })"
           >
             {{ $t('websites.addFirstDomain') }}
           </VButton>
@@ -350,11 +350,7 @@
       </template>
     </VCard>
 
-    <!-- Add Website Wizard -->
-    <AddWebsiteWizard
-      v-model:show="showCreateModal"
-      @created="handleDomainCreated"
-    />
+    <!-- Add Website Wizard (removed - now using /websites/create page) -->
 
     <!-- Edit Domain Modal -->
     <EditDomainModal
