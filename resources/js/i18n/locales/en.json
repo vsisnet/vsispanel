@@ -71,7 +71,8 @@
     "resetPasswordDesc": "Enter your new password below.",
     "newPassword": "New Password",
     "confirmPassword": "Confirm Password",
-    "passwordResetSuccess": "Your password has been reset successfully."
+    "passwordResetSuccess": "Your password has been reset successfully.",
+    "username": "Username"
   },
   "nav": {
     "dashboard": "Dashboard",

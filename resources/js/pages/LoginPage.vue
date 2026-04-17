@@ -9,11 +9,11 @@
       </div>
 
       <VInput
-        v-model="form.email"
-        type="email"
-        :label="$t('auth.email')"
-        :placeholder="$t('auth.email')"
-        :error="errors.email"
+        v-model="form.username"
+        type="text"
+        :label="$t('auth.username')"
+        :placeholder="$t('auth.username')"
+        :error="errors.username"
         required
         autofocus
       />
@@ -131,13 +131,13 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const form = reactive({
-  email: '',
+  username: '',
   password: '',
   remember: false
 })
 
 const errors = reactive({
-  email: '',
+  username: '',
   password: '',
   code: '',
   general: ''
@@ -148,7 +148,7 @@ const showTwoFactor = computed(() => authStore.requires2FA)
 const isLoading = computed(() => authStore.isLoading)
 
 function clearErrors() {
-  errors.email = ''
+  errors.username = ''
   errors.password = ''
   errors.code = ''
   errors.general = ''
@@ -158,7 +158,7 @@ async function handleLogin() {
   clearErrors()
 
   try {
-    const result = await authStore.login(form.email, form.password)
+    const result = await authStore.login(form.username, form.password)
 
     if (result.requires2FA) {
       // Show 2FA form
@@ -176,7 +176,7 @@ async function handleLogin() {
   } catch (error) {
     if (error.response?.status === 422) {
       const validationErrors = error.response.data.error?.errors || {}
-      errors.email = validationErrors.email?.[0] || ''
+      errors.username = validationErrors.username?.[0] || ''
       errors.password = validationErrors.password?.[0] || ''
     } else if (error.response?.status === 401) {
       errors.general = t('auth.loginFailed')

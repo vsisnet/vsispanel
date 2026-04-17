@@ -71,7 +71,8 @@
     "resetPasswordDesc": "Nhập mật khẩu mới bên dưới.",
     "newPassword": "Mật khẩu mới",
     "confirmPassword": "Xác nhận mật khẩu",
-    "passwordResetSuccess": "Mật khẩu đã được đặt lại thành công."
+    "passwordResetSuccess": "Mật khẩu đã được đặt lại thành công.",
+    "username": "Tên đăng nhập"
   },
   "nav": {
     "dashboard": "Bảng điều khiển",

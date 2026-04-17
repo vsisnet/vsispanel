@@ -19,13 +19,13 @@ export const useAuthStore = defineStore('auth', () => {
   const userRole = computed(() => user.value?.role || '')
 
   // Actions
-  async function login(email, password) {
+  async function login(username, password) {
     isLoading.value = true
     requires2FA.value = false
 
     try {
       await initCsrf()
-      const response = await api.post('/auth/login', { email, password })
+      const response = await api.post('/auth/login', { username, password })
       const data = response.data.data
 
       if (data.requires_2fa) {

@@ -181,7 +181,7 @@ const navigationGroups = [
       { name: 'ssl', route: 'ssl', label: 'nav.ssl', icon: LockClosedIcon, permission: 'ssl.view' },
       { name: 'firewall', route: 'firewall', label: 'nav.firewall', icon: ShieldCheckIcon, permission: 'firewall.view' },
       { name: 'security', route: 'security', label: 'nav.security', icon: WrenchScrewdriverIcon, permission: 'security.view' },
-      { name: 'backup', route: 'backup', label: 'nav.backup', icon: CloudArrowUpIcon, permission: 'backup.view' }
+      { name: 'backup', route: 'backup', label: 'nav.backup', icon: CloudArrowUpIcon, permission: 'backup.view', adminOnly: true }
     ]
   },
   {
